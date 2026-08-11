@@ -7,7 +7,9 @@
 
 프로젝트 원격 저장소가 생성되었습니다.
 
-`git clone https://github.com/akqjq1000/QR-Checker.git`
+``` bash
+git clone https://github.com/akqjq1000/QR-Checker.git
+```
 
 #### 참고 사항
 
