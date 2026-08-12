@@ -2,12 +2,14 @@ import sqlite3
 
 class QrDB:
     def __init__(self):
-        self.conn = sqlite3.connect('qr.db')
+        self.conn = sqlite3.connect('./qr.db')
+        self._init_db()
 
     def _init_db(self):
         sql = '''
         CREATE TABLE IF NOT EXISTS qr_items(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
             img_src TEXT NOT NULL,
             is_malicious INT,
             confidence_score INT,
@@ -41,3 +43,7 @@ class QrDB:
 
     def __del__(self):
         self.conn.close()
+
+# 테스트 코드
+if __name__ == "__main__":
+    qrdb = QrDB()
