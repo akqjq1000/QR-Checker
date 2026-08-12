@@ -1,13 +1,18 @@
+from pathlib import Path
+
 import streamlit as st
 from modules import feature_extractor_dummy as feature_extractor
 from modules import ml_detector_dummy as ml_detector
 from modules import rag_engine_dummy as rag_engine
+from modules import qr_decoder_dummy as qr_decoder
 
 
 from modules.schema import AnalysisResult, ScanReport, FeatureVector
 
 st.set_page_config(page_title="QR-Shield", page_icon="")
 st.title("QR-Shield")
+
+DATA_DIR = Path(__file__).parent / "data"
 
 # ===========================================================
 # 렌더링 함수 
@@ -60,16 +65,24 @@ def build_report(url: str) -> ScanReport:
 # ===========================================================
 # 화면
 # ===========================================================
-with st.sidebar:
-    st.header("입력")
-    url_input = st.text_input("검사할 URL")
-    run = st.button("분석 시작", type="primary", use_container_width=True)
+st.header("입력")
+qr_image = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
+save = st.button("저장", type="primary")
 
-if run:
-    report = build_report(url_input)
-    st.session_state["last_report"] = report
- 
+if save and qr_image is not None:
+      save_path = DATA_DIR / qr_image.name
+      save_path.write_bytes(qr_image.getvalue())
+      st.success(f"저장 완료: {save_path}")
+  
+      url = qr_decoder.extract_url_from_qr(save_path)
+      if url is None:
+          st.warning("QR 코드에서 URL을 인식하지 못했습니다.")
+      else:
+          report = build_report(url)
+          st.session_state["last_report"] = report
+
+    
 if "last_report" in st.session_state:
     render_report(st.session_state["last_report"])
 else:
-    st.info("사이드바에서 URL을 입력하고 '분석 시작'을 눌러주세요.")
+    st.info("QR 코드 이미지를 업로드하고 '저장'을 눌러주세요.")
