@@ -4,7 +4,7 @@ import streamlit as st
 from modules import feature_extractor_dummy as feature_extractor
 from modules import ml_detector_dummy as ml_detector
 from modules import rag_engine_dummy as rag_engine
-from modules import qr_decoder_dummy as qr_decoder
+from modules import qr_decoder
 
 
 from modules.schema import AnalysisResult, ScanReport, FeatureVector
@@ -13,6 +13,7 @@ st.set_page_config(page_title="QR-Shield", page_icon="")
 st.title("QR-Shield")
 
 DATA_DIR = Path(__file__).parent / "data"
+engine = rag_engine.RAGEngine()
 
 # ===========================================================
 # 렌더링 함수 
@@ -54,12 +55,32 @@ def render_report(report: ScanReport) -> None:
 # ===========================================================
 # 파이프라인
 # ===========================================================
-def build_report(url: str) -> ScanReport:
+def analyze_url(url: str) -> None:
+    """URL을 받아 피처 추출·탐지까지 수행하고, RAG 상담 세션을 시작."""
     features = feature_extractor.extract(url)
     detection = ml_detector.predict(features)
+    st.session_state["pending"] = {"url": url, "features": features, "detection": detection}
+
     with st.spinner("보안 지침 문서를 검색해 분석하는 중..."):
-        analysis = rag_engine.analyze(url, features, detection)
-    return ScanReport(url=url, features=features, detection=detection, analysis=analysis)
+        result = engine.init_scan(url, detection)
+    _handle_rag_result(result)
+
+
+def _handle_rag_result(result: dict) -> None:
+    """RAG 엔진 응답을 해석해 최종 리포트를 완성하거나, 사용자 답변 대기 상태로 전환."""
+    if result["status"] == "completed":
+        pending = st.session_state.pop("pending")
+        st.session_state["last_report"] = ScanReport(
+            url=pending["url"],
+            features=pending["features"],
+            detection=pending["detection"],
+            analysis=result["result"],
+        )
+        st.session_state.pop("chat_session_id", None)
+        st.session_state.pop("chat_message", None)
+    else:  # chat_required — 대응방침을 받기 전 사용자 응답이 필요
+        st.session_state["chat_session_id"] = result["session_id"]
+        st.session_state["chat_message"] = result["message"]
 
 
 # ===========================================================
@@ -70,18 +91,25 @@ qr_image = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["
 save = st.button("저장", type="primary")
 
 if save and qr_image is not None:
-      save_path = DATA_DIR / qr_image.name
-      save_path.write_bytes(qr_image.getvalue())
-      st.success(f"저장 완료: {save_path}")
-  
-      url = qr_decoder.extract_url_from_qr(save_path)
-      if url is None:
-          st.warning("QR 코드에서 URL을 인식하지 못했습니다.")
-      else:
-          report = build_report(url)
-          st.session_state["last_report"] = report
+    save_path = DATA_DIR / qr_image.name
+    save_path.write_bytes(qr_image.getvalue())
+    st.success(f"저장 완료: {save_path}")
 
-    
+    url = qr_decoder.extract_url_from_qr(save_path)
+    if url is None:
+        st.warning("QR 코드에서 URL을 인식하지 못했습니다.")
+    else:
+        analyze_url(url)
+
+if "chat_session_id" in st.session_state:
+    st.divider()
+    st.subheader("추가 확인이 필요합니다")
+    st.markdown(st.session_state["chat_message"])
+    user_reply = st.chat_input("답변을 입력하세요")
+    if user_reply:
+        result = engine.chat(st.session_state["chat_session_id"], user_reply)
+        _handle_rag_result(result)
+
 if "last_report" in st.session_state:
     render_report(st.session_state["last_report"])
 else:
