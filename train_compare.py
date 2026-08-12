@@ -86,7 +86,7 @@ def main():
     # 4. 최종 결과 비교 표 출력
     print("3. [ 최종 모델 성능 비교 ]")
     results_df = pd.DataFrame(results).set_index("Model")
-    print(results_df.to_markdown())
+    print(results_df.to_string())
     print("\n학습 프로세스가 모두 종료되었습니다.")
 
 if __name__ == "__main__":
