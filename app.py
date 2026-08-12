@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import streamlit as st
 from modules import feature_extractor_dummy as feature_extractor
 from modules import ml_detector_dummy as ml_detector
@@ -73,3 +74,7 @@ if "last_report" in st.session_state:
     render_report(st.session_state["last_report"])
 else:
     st.info("사이드바에서 URL을 입력하고 '분석 시작'을 눌러주세요.")
+=======
+import os
+from dotenv import load_dotenv
+>>>>>>> 256981f30786bf7ff94ddfbfad5f9eb96958b0d2
