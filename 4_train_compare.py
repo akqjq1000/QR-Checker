@@ -40,10 +40,10 @@ df['Label'] = df['Label'].astype(str).str.strip().str.lower()
 
 print(df['Label'].unique())
 
-# Label 숫자 변환 (악성=0, 정상=1)
+# Label 숫자 변환 (악성=1, 정상=0)
 df['label'] = df['Label'].map({
-    'good': 1,
-    'bad': 0
+    'good': 0,
+    'bad': 1
 })
 
 print(df['label'].value_counts())
@@ -140,13 +140,13 @@ def extract_features(url):
         root_domain = domain
 
     # IP 주소 여부
-    is_ip = 0
-
     try:
-        ipaddress.ip_address(hostname)
-        is_ip = 1
+        ip_obj = ipaddress.ip_address(hostname)
+        is_ip = True
+        is_private = ip_obj.is_private
     except:
-        is_ip = 0
+        is_ip = False
+        is_private = False
 
     # 포트 번호
     try:
@@ -157,13 +157,17 @@ def extract_features(url):
     # 의심 키워드
     url_lower = url.lower()
 
-    is_filter = int(
-        any(keyword in url_lower for keyword in suspicious_keywords)
+    is_filter = any(
+        keyword in url_lower
+        for keyword in suspicious_keywords
     )
-
-    # 숫자 개수
+  
+    # 알파벳 / 숫자 비율
+    alpha_count = sum(char.isalpha() for char in url)
     numeric_count = sum(char.isdigit() for char in url)
 
+    ratio_alpha_numeric = numeric_count / max(alpha_count, 1)
+    
     # %20, %2F 같은 URL 인코딩
     encoded_list = re.findall(
         r'%[0-9a-fA-F]{2}',
@@ -192,6 +196,7 @@ def extract_features(url):
         'len_suffix': len(suffix),
         'len_encoding': len(encoded_list) * 3,
         'len_query': len(query),
+
         'count_sub_domain': count_sub_domain,
         'count_file_path': len(path_parts),
         'count_special_char': sum(
@@ -199,12 +204,15 @@ def extract_features(url):
             for char in url
         ),
         'count_url_dots': url.count('.'),
+
         'is_ip': is_ip,
+        'is_private': is_private,
         'is_filter': is_filter,
         'num_port': port,
+
+        'ratio_alpha_numeric': ratio_alpha_numeric,
         'value_entropy_url': calculate_entropy(url)
     }
-
     return features
 
 # 피처 추출 함수 테스트
@@ -307,19 +315,19 @@ accuracy = accuracy_score(
 precision = precision_score(
     y_test,
     y_pred,
-    pos_label=0
+    pos_label=1
 )
 
 recall = recall_score(
     y_test,
     y_pred,
-    pos_label=0
+    pos_label=1
 )
 
 f1 = f1_score(
     y_test,
     y_pred,
-    pos_label=0
+    pos_label=1
 )
 
 print("Accuracy :", accuracy)
@@ -331,7 +339,7 @@ print(
     confusion_matrix(
         y_test,
         y_pred,
-        labels=[0, 1]
+        labels=[1, 0]
     )
 )
 
@@ -339,7 +347,7 @@ print(
     classification_report(
         y_test,
         y_pred,
-        labels=[0, 1],
+        labels=[1, 0],
         target_names=[
             '악성',
             '정상'
@@ -364,7 +372,7 @@ print(
     classification_report(
         y_test,
         y_pred_tuned,
-        labels=[0, 1],
+        labels=[1, 0],
         target_names=['악성', '정상']
     )
 )
@@ -396,7 +404,7 @@ print(
     classification_report(
         y_test,
         xgb_pred,
-        labels=[0, 1],
+        labels=[1, 0],
         target_names=['악성', '정상']
     )
 )
@@ -442,7 +450,7 @@ print(
     classification_report(
         y_test,
         xgb_pred_tuned2,
-        labels=[0, 1],
+        labels=[1, 0],
         target_names=['악성', '정상']
     )
 )
