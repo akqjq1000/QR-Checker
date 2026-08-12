@@ -1,11 +1,14 @@
 from pathlib import Path
 
 import streamlit as st
-from modules import feature_extractor_dummy as feature_extractor
-from modules import ml_detector_dummy as ml_detector
-from modules import rag_engine_dummy as rag_engine
-from modules import qr_decoder_dummy as qr_decoder
-
+#from modules import feature_extractor_dummy as feature_extractor
+# from modules import ml_detector_dummy as ml_detector
+# from modules import qr_decoder_dummy as qr_decoder
+# from modules import rag_engine_dummy as rag_engine
+import modules.qr_decoder as qr_decoder
+from modules.ml_detector import MaliciousURLDetector
+from modules.url_to_feature import extract_features
+from modules.AI_RAG.rag_engine import AnalysisResult, RAGEngine
 
 from modules.schema import AnalysisResult, ScanReport, FeatureVector
 
@@ -55,9 +58,11 @@ def render_report(report: ScanReport) -> None:
 # 파이프라인
 # ===========================================================
 def build_report(url: str) -> ScanReport:
-    features = feature_extractor.extract(url)
-    detection = ml_detector.predict(features)
+    features = extract_features(url)
+    ml_detector = MaliciousURLDetector()
+    detection = ml_detector.predict(features=features)
     with st.spinner("보안 지침 문서를 검색해 분석하는 중..."):
+        rag_engine = RAGEngine()
         analysis = rag_engine.analyze(url, features, detection)
     return ScanReport(url=url, features=features, detection=detection, analysis=analysis)
 

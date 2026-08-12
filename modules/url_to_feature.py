@@ -13,7 +13,7 @@ import re
 from typing import Final
 from urllib.parse import ParseResult, urlparse
 
-from schema import FEATURE_ORDER, FeatureVector
+from .schema import *
 
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})

@@ -2,7 +2,8 @@ import os
 import joblib
 import numpy as np
 import pandas as pd
-from schema import FeatureVector, DetectionResult
+from .schema import *
+import xgboost
 
 import random   # 데이터셋에서 랜덤하게 데이터를 뽑아오기 위함
 
