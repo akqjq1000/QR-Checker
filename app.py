@@ -66,6 +66,33 @@ def build_report(url: str) -> ScanReport:
         analysis = rag_engine.analyze(url, features, detection)
     return ScanReport(url=url, features=features, detection=detection, analysis=analysis)
 
+def analyze_url(url: str) -> None:
+    """URL을 받아 피처 추출·탐지까지 수행하고, RAG 상담 세션을 시작."""
+    features = extract_features(url)
+    ml_detector = MaliciousURLDetector()
+    detection = ml_detector.predict(features=features)
+    st.session_state["pending"] = {"url": url, "features": features, "detection": detection}
+
+    with st.spinner("보안 지침 문서를 검색해 분석하는 중..."):
+        rag_engine = RAGEngine()
+        result = rag_engine.init_scan(url, detection)
+    _handle_rag_result(result)
+
+def _handle_rag_result(result: dict) -> None:
+    """RAG 엔진 응답을 해석해 최종 리포트를 완성하거나, 사용자 답변 대기 상태로 전환."""
+    if result["status"] == "completed":
+        pending = st.session_state.pop("pending")
+        st.session_state["last_report"] = ScanReport(
+            url=pending["url"],
+            features=pending["features"],
+            detection=pending["detection"],
+            analysis=result["result"],
+        )
+        st.session_state.pop("chat_session_id", None)
+        st.session_state.pop("chat_message", None)
+    else:  # chat_required — 대응방침을 받기 전 사용자 응답이 필요
+        st.session_state["chat_session_id"] = result["session_id"]
+        st.session_state["chat_message"] = result["message"]
 
 # ===========================================================
 # 화면
