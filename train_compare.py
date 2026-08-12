@@ -71,9 +71,9 @@ def main():
     print("1. 데이터를 로드하고 분할합니다...")
     df = pd.read_csv(data_path)
 
-    # 타겟 컬럼명은 실제 환경에 맞게 'label'으로
+    # 타겟 컬럼명은 실제 환경에 맞게 'label'으로 (bad -> 1:악성, good -> 0:정상)
     X = df[FEATURE_ORDER]
-    y = df['label'] 
+    y = df['label'].map({'bad': 1, 'good': 0})
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
    
