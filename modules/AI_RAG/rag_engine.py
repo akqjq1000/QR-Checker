@@ -1,15 +1,3 @@
-# --------------------------------------------------------
-# 전체 탐지 흐름
-# --------------------------------------------------------
-'''
-DetectionResult (ML 탐지 결과) 
-    → analyze() 
-        → check_external_database() (DB 조회)
-        → register_malicious_url() (악성이면 등록)
-        → generate_rag_response() (OpenAI Assistant한테 분석 사유 물어봄)
-    → AnalysisResult 반환
-'''
-
 import os
 import json
 from dotenv import load_dotenv
@@ -18,7 +6,6 @@ from openai import APIError, APIConnectionError, RateLimitError
 
 # ---------------------------------------------------------
 # 1. 공통 스키마 파일에서 약속된 데이터 형식 불러오기
-# (같은 modules 폴더 안에 있으므로 바로 import 가능해!)
 # ---------------------------------------------------------
 from schema import DetectionResult, AnalysisResult
 
@@ -31,7 +18,6 @@ load_dotenv()
 class RAGEngine:
     def __init__(self):
         # OpenAI 클라이언트 및 Assistant ID 초기화
-        # (.env 파일에 OPENAI_API_KEY와 OPENAI_ASSISTANT_ID가 설정되어 있어야 해)
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY가 설정되지 않았습니다.")
         if not os.getenv("OPENAI_ASSISTANT_ID"):
@@ -44,6 +30,8 @@ class RAGEngine:
         print(f"[DB Search] {url} 외부 DB 조회 중...")
         # TODO: 실제 외부 데이터베이스 조회 로직 추가
         return False
+
+## 사용자가 등록하는 DB가 필요할까요????
 
     def register_malicious_url(self, url: str):
         """기능 4: 악성 URL 사용자 DB 등록"""
