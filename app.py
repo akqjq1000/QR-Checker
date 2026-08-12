@@ -1,11 +1,14 @@
 from pathlib import Path
 
 import streamlit as st
-from modules import feature_extractor_dummy as feature_extractor
-from modules import ml_detector_dummy as ml_detector
-from modules import rag_engine_dummy as rag_engine
-from modules import qr_decoder
-
+#from modules import feature_extractor_dummy as feature_extractor
+# from modules import ml_detector_dummy as ml_detector
+# from modules import qr_decoder_dummy as qr_decoder
+# from modules import rag_engine_dummy as rag_engine
+import modules.qr_decoder as qr_decoder
+from modules.ml_detector import MaliciousURLDetector
+from modules.url_to_feature import extract_features
+from modules.AI_RAG.rag_engine import AnalysisResult, RAGEngine
 
 from modules.schema import AnalysisResult, ScanReport, FeatureVector
 
@@ -13,7 +16,7 @@ st.set_page_config(page_title="QR-Shield", page_icon="")
 st.title("QR-Shield")
 
 DATA_DIR = Path(__file__).parent / "data"
-engine = rag_engine.RAGEngine()
+engine = RAGEngine()
 
 # ===========================================================
 # 렌더링 함수 
@@ -57,8 +60,8 @@ def render_report(report: ScanReport) -> None:
 # ===========================================================
 def analyze_url(url: str) -> None:
     """URL을 받아 피처 추출·탐지까지 수행하고, RAG 상담 세션을 시작."""
-    features = feature_extractor.extract(url)
-    detection = ml_detector.predict(features)
+    features = extract_features(url)
+    detection = MaliciousURLDetector.predict(features)
     st.session_state["pending"] = {"url": url, "features": features, "detection": detection}
 
     with st.spinner("보안 지침 문서를 검색해 분석하는 중..."):
@@ -81,6 +84,7 @@ def _handle_rag_result(result: dict) -> None:
     else:  # chat_required — 대응방침을 받기 전 사용자 응답이 필요
         st.session_state["chat_session_id"] = result["session_id"]
         st.session_state["chat_message"] = result["message"]
+
 
 
 # ===========================================================
