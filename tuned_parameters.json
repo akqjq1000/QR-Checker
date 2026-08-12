@@ -1,8 +1,4 @@
 {
-  "label_mapping": {
-    "malicious": 0,
-    "legitimate": 1
-  },
   "RandomForest_tuned": {
     "n_estimators": 200,
     "class_weight": "balanced",
