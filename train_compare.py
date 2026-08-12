@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import pandas as pd
 import numpy as np
 import joblib
@@ -12,25 +13,60 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
-# schema.py에 정의된 피처 순서를 가져옴
-from modules.schema import FEATURE_ORDER
+current_dir = os.path.dirname(os.path.abspath(__file__))
+modules_path = os.path.join(current_dir, 'modules') # train_compare.py가 QR-Checker에 있다고 가정했을 때 위치
+sys.path.append(modules_path)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
 try:
     from schema import FEATURE_ORDER
 except ImportError:
     print("schema.py를 찾을 수 없습니다. 경로를 확인해주세요.")
     # 임시 우회 (나중에 문제가 없으면 실제 실행 시에는 지워도 됨)
-    FEATURE_ORDER = ['len_url', 'len_sub_domain', 'len_root_domain', 'len_suffix', 'len_encoding', 'len_query', 'count_sub_domain', 'count_file_path', 'count_special_char', 'count_url_dots', 'is_ip', 'is_private', 'is_filter', 'num_port', 'ratio_alpha_numeric', 'value_entropy_url']
+    FEATURE_ORDER = [
+        'len_url', 'len_sub_domain', 'len_root_domain', 'len_suffix',
+        'len_encoding', 'len_query', 'count_sub_domain', 'count_file_path',
+        'count_special_char', 'count_url_dots', 'is_ip', 'is_private',
+        'is_filter', 'num_port', 'ratio_alpha_numeric', 'value_entropy_url'
+    ]
 
 def main():
     data_path = 'data/train_urls.csv'
     model_dir = 'models'
+    json_path = os.path.join(current_dir, 'tuned_parameters.json')
 
     # 1. 데이터 로드
     if not os.path.exists(data_path):
         print(f"오류: {data_path} 파일이 없습니다. 데이터를 먼저 준비해 주세요.")
         return
+
+    # 2. 각 모델의 파라미터값 로드
+    if os.path.exists(json_path):
+        with open(json_path, 'r', encoding='utf-8') as f:
+            MODEL_PARAMS = json.load(f)
+        print(f"[Config] 최적화된 하이퍼파라미터 로드 완료: {json_path}")
+    else:
+        print(f"[Config] 경고: {json_path} 파일을 찾을 수 없어 기본 설정을 사용합니다.")
+        MODEL_PARAMS = {
+            "RandomForest": {
+                "n_estimators": 100, 
+                "max_depth": 10, 
+                "random_state": 42
+            },
+            "XGBoost": {
+                "objective": "binary:logistic", 
+                "eval_metric": "logloss", 
+                "max_depth": 6, 
+                "learning_rate": 0.1, 
+                "n_estimators": 100, 
+                "random_state": 42,
+                "use_label_encoder": False
+            },
+            "LightGBM": {
+                "n_estimators": 100, 
+                "learning_rate": 0.1, 
+                "random_state": 42
+            }
+        }
 
     print("1. 데이터를 로드하고 분할합니다...")
     df = pd.read_csv(data_path)
@@ -41,13 +77,13 @@ def main():
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
    
-    # ===================================================
-    # 2. 비교할 모델 정의 (원하는 모델을 얼마든지 추가/수정 가능)
-    # ===================================================
+    # ========================================================================
+    # 3. 읽어온 파라미터로 모델 정의 (수정은 "tuned_parameters.json"에서 부탁들비니다)
+    # ========================================================================
     models = {
-        "RandomForest": RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42),
-        "XGBoost": xgb.XGBClassifier(objective='binary:logistic', eval_metric='logloss', max_depth=6, learning_rate=0.1, n_estimators=100, random_state=42, use_label_encoder=False),
-        "LightGBM": lgb.LGBMClassifier(n_estimators=100, learning_rate=0.1, random_state=42)
+        "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
+        "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
+        "LightGBM": lgb.LGBMClassifier(**MODEL_PARAMS["LightGBM"])
     }
 
     results = []
