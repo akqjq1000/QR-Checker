@@ -3,9 +3,10 @@ from pathlib import Path
 
 import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
-from modules.AI_RAG.rag_engine4 import RAGEngine
+from modules.AI_RAG.rag_engine5 import RAGEngine
 from modules.url_to_feature import extract_features
 from modules.web_screenshot import capture_website # 잠시 비활성화
+from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
 # 웹 타이틀과 설명
@@ -39,6 +40,14 @@ if analysis_btn and img:
         url = qr_decoder.extract_url_from_qr(str(save_path))
 
         if url: # URL이 확인되면
+            # 짧은 URL 풀기
+            try:
+                resolved = resolve_url(url)
+                if resolved and resolved != url:
+                    url = resolved
+            except URLResolutionError as e:
+                # 리디렉트 추적 실패 시 경고를 남기고 원본 URL로 진행
+                st.warning(f"URL 확장 오류: {e}. 원본 URL로 검사합니다.")
             features = extract_features(url) # 피처 추출
             if not isinstance(features, FeatureVector): # 결과값 검증
                 try:
@@ -75,24 +84,15 @@ if analysis_btn and img:
                     # 만약 악성 URL이라면 사용자와 2번의 채팅을 통해 RAG/파일 서치 + 웹 서치 진행
                     session_id = rag_response.get('session_id') # RAG 파트에서 사용할 세션 아이디
                     message = rag_response.get('message') # RAG 파트에서 제공해준 결과 메시지
-            # elif isinstance(rag_response, (list, tuple)):
-            #     if len(rag_response) >= 1:
-            #         status = rag_response[0]
-            #         if status == 'completed' and len(rag_response) >= 2:
-            #             analysis = rag_response[1]
-            #         elif status == 'chat_required' and len(rag_response) >= 3:
-            #             session_id = rag_response[1]
-            #             message = rag_response[2]
 
-            # 분석 결과값 검증
-            # 만약 AnalysisResult 형태로 나오지 않는다면 
+            # 응답 결과를 생성할 때 형식이 일치하지 않으면 강제로 맞추는 기능
             if analysis and not isinstance(analysis, AnalysisResult) and isinstance(analysis, dict):
                 try:
                     analysis = AnalysisResult(**analysis) # 임시 분석 결과 생성
                 except Exception:
                     analysis = AnalysisResult(reason=str(analysis), countermeasures=[]) # 임시 분석 결과 생성
 
-            # 결과 리포트 생성
+            # 결과 리포트 먼저 만들고 만약 채팅이 필요하다면 추후 처리
             st.session_state.scan_result = ScanReport(url=url, features=features, detection=detection_result, analysis=analysis)
 
             if status == 'completed':
@@ -101,11 +101,11 @@ if analysis_btn and img:
             elif status == 'chat_required':
                 st.session_state.chat_session_id = session_id
                 st.session_state.chat_history = [{"role": "assistant", "content": message or "추가 정보가 필요합니다."}]
-            else:
+            else: # 대화 초기화
                 st.session_state.chat_session_id = None
                 st.session_state.chat_history = []
 
-        else:
+        else: # URL이 없을 경우
             st.warning('추출된 URL이 없습니다. 선명한 이미지를 사용해주세요.')
     except Exception as e:
         st.error(f'오류 발생: {e}')
@@ -119,6 +119,8 @@ if st.session_state.scan_result:
 
     st.markdown("---")
     st.subheader("🔍 분석 대상")
+    # 임시 URL 화면 출력
+    st.info(f'추출된 URL: {url}')
 
     # 악성 URL의 경우 문제가 있을 수 있어서 임시 주석
     # 클릭 가능한 URL 버튼: 클릭 시 스크린샷 생성 및 미리보기
@@ -155,9 +157,10 @@ if st.session_state.scan_result:
 
         # 채팅 입력창 (세션 ID가 있을 때만 활성화)
         if st.session_state.chat_session_id:
+            # 사용자 입력 받기
             user_input = st.chat_input("질문을 입력하세요 (예: 접속했어요, 아니요)")
             if user_input:
-                # 사용자 메시지 추가 및 표시
+                # 사용자 메시지 가공하여 전달
                 st.session_state.chat_history.append({"role": "user", "content": user_input})
                 with st.chat_message("user"):
                     st.write(user_input)
@@ -166,7 +169,6 @@ if st.session_state.scan_result:
                 with st.spinner("AI 분석 중..."):
                     rag_response = st.session_state.rag_engine.chat(st.session_state.chat_session_id, user_input)
 
-                    # Normalize possible return formats (dict or tuple)
                     c_status = None
                     c_analysis = None
                     c_message = None
@@ -178,42 +180,37 @@ if st.session_state.scan_result:
                             c_analysis = rag_response.get('result')
                         else:
                             c_message = rag_response.get('message')
-                    elif isinstance(rag_response, (list, tuple)):
-                        if len(rag_response) >= 1:
-                            c_status = rag_response[0]
-                            if c_status == 'completed' and len(rag_response) >= 2:
-                                c_analysis = rag_response[1]
-                            elif c_status == 'chat_required' and len(rag_response) >= 3:
-                                c_session = rag_response[1]
-                                c_message = rag_response[2]
                     
+                    # RAG 엔진 내부 처리 결과 완료 상태이고 결과값이 제공 되었다면
                     if c_status == 'completed' and c_analysis is not None:
-                        # coerce analysis if dict
+                        # 응답 결과를 생성할 때 형식이 일치하지 않으면 강제로 맞추는 기능
                         if not isinstance(c_analysis, AnalysisResult) and isinstance(c_analysis, dict):
                             try:
                                 c_analysis = AnalysisResult(**c_analysis)
                             except Exception:
                                 c_analysis = AnalysisResult(reason=str(c_analysis), countermeasures=[])
 
-                        # update stored ScanReport.analysis
+                        # ScanReport로 받아 세션의 scan_result와 동일한 형식인지 검사
                         if isinstance(st.session_state.get('scan_result'), ScanReport):
-                            st.session_state.scan_result.analysis = c_analysis
+                            st.session_state.scan_result.analysis = c_analysis # 최종 분석 결과를 저장
 
+                        # 최종 분석 결과
                         final_msg = (f"**[최종 분석 결과]**\n\n{c_analysis.reason}\n\n"
-                                     f"**대응 지침:**\n• " + "\n• ".join(c_analysis.countermeasures))
+                                     f"**대응 지침:**\n\n• " + "\n\n• ".join(c_analysis.countermeasures))
                         st.session_state.chat_history.append({"role": "assistant", "content": final_msg})
                         st.session_state.chat_session_id = None
 
                     elif c_status == 'chat_required':
-                        # continue chat — append message if provided
+                        # 처음 질문에 예를 답한 경우
                         msg = c_message or rag_response if isinstance(rag_response, str) else c_message
                         st.session_state.chat_history.append({"role": "assistant", "content": msg})
-                        # keep session id
+
+                        # 세션 ID 유지하여 기존 응답 기억
                         if c_session:
                             st.session_state.chat_session_id = c_session
 
                     else:
-                        # error or unexpected
+                        # 만약 상태 정보가 일치하는 게 없다면 오류
                         msg = None
                         if isinstance(rag_response, dict):
                             msg = rag_response.get('message')
