@@ -3,7 +3,7 @@ from pathlib import Path
 
 import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
-from modules.AI_RAG.rag_engine2 import RAGEngine
+from modules.AI_RAG.rag_engine4 import RAGEngine
 from modules.url_to_feature import extract_features
 from modules.web_screenshot import capture_website
 
@@ -26,7 +26,7 @@ analysis_btn = st.button('분석', type='primary')
 # 2. 분석 로직 (버튼 클릭 시 실행)
 if analysis_btn and img:
     try:
-        DATA_DIR = Path(__file__).parent / "data"
+        DATA_DIR = Path(__file__).parent / "data/qr-image"
         DATA_DIR.mkdir(exist_ok=True) # 데이터 폴더가 없으면 생성
         save_path = DATA_DIR / img.name
         save_path.write_bytes(img.getvalue())
