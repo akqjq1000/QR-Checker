@@ -81,8 +81,8 @@ def main():
     # 3. 읽어온 파라미터로 모델 정의 (수정은 "tuned_parameters.json"에서 부탁들비니다)
     # ========================================================================
     models = {
-        "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
-        "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
+        # "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
+        # "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
         "LightGBM": lgb.LGBMClassifier(**MODEL_PARAMS["LightGBM"])
     }
 
@@ -94,9 +94,24 @@ def main():
     # 3. 모델 순차적 학습 및 평가
     for model_name, model in models.items():
         print(f"[{model_name}] 학습 중...")
-        model.fit(X_train, y_train)
 
-        # 예측 수행
+        if model_name == "LightGBM":
+            # early stopping용 검증셋을 train에서 분리 (test set은 최종 평가용으로 보존)
+            X_tr, X_val, y_tr, y_val = train_test_split(
+                X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+            )
+            model.fit(
+                X_tr, y_tr,
+                eval_X=X_val, eval_y=y_val,
+                eval_metric='logloss',
+                callbacks=[
+                    lgb.early_stopping(stopping_rounds=50),
+                    lgb.log_evaluation(period=100)
+                ]
+            )
+        else:
+            model.fit(X_train, y_train)
+
         y_pred = model.predict(X_test)
 
         # 성능 지표 계산
