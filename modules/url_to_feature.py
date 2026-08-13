@@ -13,7 +13,10 @@ import re
 from typing import Final
 from urllib.parse import ParseResult, urlparse
 
-from .schema import *
+try:
+    from .schema import *
+except ImportError:
+    from schema import *
 
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
@@ -33,7 +36,9 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
 
 
 def _validate_url_text(url: str) -> str:
-    """URL 입력값을 검사하고 앞뒤 공백을 제거한 원본 문자열을 반환한다."""
+    """URL 입력값을 검사하고, 스킴(http/https)을 제거한 순수 문자열을 반환한다.
+    스킴 유무가 다른 피처 값에 영향을 주지 않도록, 검증 후 스킴을 떼어낸다.
+    """
 
     if not isinstance(url, str):
         raise TypeError("url은 문자열(str)이어야 합니다.")
@@ -51,6 +56,7 @@ def _validate_url_text(url: str) -> str:
         scheme = cleaned_url.split(":", 1)[0].lower()
         if scheme not in _HTTP_SCHEMES:
             raise ValueError("http:// 또는 https:// URL만 지원합니다.")
+        cleaned_url = cleaned_url[scheme_match.end():]
 
     return cleaned_url
 

@@ -81,9 +81,12 @@ def main():
     # 3. 읽어온 파라미터로 모델 정의 (수정은 "tuned_parameters.json"에서 부탁들비니다)
     # ========================================================================
     models = {
-        "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
-        "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
-        "LightGBM": lgb.LGBMClassifier(**MODEL_PARAMS["LightGBM"])
+        # "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
+        "XGBoost": xgb.XGBClassifier(
+            **MODEL_PARAMS["XGBoost_tuned"],
+            early_stopping_rounds=50,
+        ),
+        # "LightGBM": lgb.LGBMClassifier(**MODEL_PARAMS["LightGBM"])
     }
 
     results = []
@@ -109,6 +112,17 @@ def main():
                     lgb.log_evaluation(period=100)
                 ]
             )
+        elif model_name == "XGBoost":
+            # early stopping용 검증셋을 train에서 분리 (test set은 최종 평가용으로 보존)
+            X_tr, X_val, y_tr, y_val = train_test_split(
+                X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+            )
+            model.fit(
+                X_tr, y_tr,
+                eval_set=[(X_val, y_val)],
+                verbose=100,
+            )
+            print(f"  -> 최적 iteration: {model.best_iteration}")
         else:
             model.fit(X_train, y_train)
 
