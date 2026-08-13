@@ -138,11 +138,14 @@ if st.session_state.scan_result:
                     # Content-Disposition 헤더에서 filename="파일명" 부분 추출
                     cd = response.headers.get('Content-Disposition', '')
                     file_name = cd.split('filename=')[1].strip('"') if 'filename=' in cd else "captured_image.png"
-                    
-                    with open(file_name, "wb") as f:
+                    # 이미지 저장 경로 지정
+                    SITE_IMAGE_DIR = Path(__file__).parent / 'data/site-image'
+                    site_image_path = SITE_IMAGE_DIR / file_name
+
+                    with open(site_image_path, "wb") as f:
                         f.write(response.content)
                     
-                    st.session_state.screenshot_path = file_name
+                    st.session_state.screenshot_path = site_image_path # 이미지 저장 경로 저장
                 else:
                     st.error(f"요청 실패 (상태 코드: {response.status_code})")
                     st.session_state.screenshot_path = None

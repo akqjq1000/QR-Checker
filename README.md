@@ -11,6 +11,21 @@
 
 프로젝트 원격 저장소가 생성되었습니다.
 
+### 프로젝트 디렉토리 구조
+
+```text
+QR-Checker
+├─chroma_db                 # RAG를 위한 데이터 등록 DB
+├─data                      # 이미지 데이터 저장을 위한 디렉토리
+│ ├─qr-image                # QR 이미지 저장
+│ ├─site-image              # 웹 사이트 미리보기 이미지 저장
+├─models                    # 머신러닝 모델(URL 악성 여부 확인)
+├─modules                   # 여러 기능 모음 디렉토리
+│ ├─AI_RAG                  # RAG 기능 모음
+├─sandbox                   # 웹 사이트 미리보기 기능을 위한 격리 환경
+│ ├─saved_images
+```
+
 ``` bash
 git clone https://github.com/akqjq1000/QR-Checker.git
 ```
@@ -52,12 +67,29 @@ docker-compose up -d
 docker compose up -d
 ```
 
+(샌드박스 초기화)
+
+**혹시 모를 악성 코드 감염 시**
+```bash
+cd QR-Checker/sandbox
+# 데이터 제거
+# compose version 1
+docker-compose down -v
+# compose version 2
+docker compose down -v
+
+# compose version 1
+docker-compose up -d --build
+# compose version 2
+docker compose up -d --build
+```
+
 > 샌드박스 구동 테스트
 `curl http://localhost:8000/api`
 
 Server is running => OK!
 
-## Start
+## 화면
 ```bash
 cd QR-Checker
 streamlit run test.py
