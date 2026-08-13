@@ -15,6 +15,10 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 class Item(BaseModel):
     url: str
 
+@app.get("/api")
+def health():
+    return 'Server is running'
+
 @app.post("/capture/")
 def capture_site(item: Item):
     file_name = capture_website(item.url, output_dir=UPLOAD_DIR)
