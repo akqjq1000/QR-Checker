@@ -30,7 +30,7 @@ class RAGEngine:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         # [수정] 파일 전체 읽기 대신 Chroma DB 클라이언트 및 컬렉션 연결
-        CHROMA_DIR = "modules/AI_RAG/docs/chroma_db"
+        CHROMA_DIR = os.path.join(current_dir, "docs", "chroma_db")
         COLLECTION_NAME = "qr_quishing_kb"
         
         self.chroma_client = chromadb.PersistentClient(path=CHROMA_DIR)

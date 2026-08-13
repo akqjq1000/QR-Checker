@@ -20,7 +20,8 @@ load_dotenv()
 
 EMBEDDING_MODEL = "text-embedding-3-small"  # 비용 대비 성능 좋음. 정확도 더 중요하면 -large로 교체
 COLLECTION_NAME = "qr_quishing_kb"
-CHROMA_DIR = "./chroma_db"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+CHROMA_DIR = os.path.join(current_dir, "docs", "chroma_db")
 BATCH_SIZE = 100  # OpenAI 임베딩 API에 한 번에 보낼 텍스트 개수
 
 # 이번 대화에서 만든 3개 필터링 결과 파일
@@ -79,7 +80,8 @@ def embed_batch(texts: list[str]) -> list[list[float]]:
 
 
 def main():
-    input_dir = Path(__file__).parent  # jsonl 파일들을 이 스크립트와 같은 폴더에 둔다고 가정
+    input_dir = Path(__file__).parent / "docs"
+    # input_dir = Path(__file__).parent  # jsonl 파일들을 이 스크립트와 같은 폴더에 둔다고 가정
     records = load_records(input_dir)
     print(f"총 {len(records)}개 청크 로드됨")
 
