@@ -12,19 +12,25 @@ QR 코드 이미지 → URL 문자열 추출
 [함수 설명]
 extract_url_from_qr(image_path)
   - 입력: 이미지 파일 경로 (문자열, 예: "C:/images/qr.png")
-  - 출력: QR 안에 담긴 URL 문자열 (인식 실패 또는 URL 형식이 아닐 시 None)
-  - 동작 방식: 한 번에 안 읽히는 QR(흐림/회전/저해상도 등)을 대비해
-    4단계로 재시도함
+  - 출력: QR 안에 담긴 URL 문자열 (인식 실패 또는 웹 URL로 볼 수 없는 경우 None)
+  - 동작 방식: 한 번에 안 읽히는 QR(흐림/회전/저해상도 등)을 대비해 4단계로 재시도
       1) 원본 이미지 그대로 시도
       2) 흑백 변환 후 시도
       3) 이진화(threshold) 후 시도
       4) 이미지가 너무 작으면(300px 미만) 확대 후 시도
-    4번 다 실패하면 None 반환
-  - 예외 처리: QR을 못 읽은 경우 / 읽었지만 http(s)로 시작하지 않는 URL 형식이 아닌 경우 
-    모두 None 반환 + 경고 출력
+  - 예외 처리:
+      1) QR을 못 읽은 경우 → None + 경고 출력
+      2) http/https가 아닌 스킴인 경우 (ftp://, tel:, mailto: 등 ://  유무와 상관없이 콜론 기반 스킴 전부 포함) → None + 경고 출력
+      3) 스킴이 아예 없는데 도메인 형태로도 볼 수 없는 경우
+      * 스킴이 없고 도메인 형태(naver.com 등)인 경우만 통과
 """
+import re
 import cv2
 from pyzbar.pyzbar import decode
+
+# 콜론 기반 스킴 전체를 판별하기 위한 패턴
+_ANY_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+_HTTP_SCHEMES = ("http://", "https://")
 
 def read_qr(image):
     decoded_objects = decode(image)
@@ -34,13 +40,11 @@ def read_qr(image):
 
 def extract_url_from_qr(image_path):
     image = cv2.imread(image_path)
-
     if image is None:
         print(f" 이미지를 불러올 수 없습니다: {image_path}")
         return None
 
     candidates = [image]
-
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     candidates.append(gray)
 
@@ -64,15 +68,20 @@ def extract_url_from_qr(image_path):
         print(f" QR 코드를 인식하지 못했습니다: {image_path}")
         return None
 
-    # 예외 케이스 2: QR은 읽었지만 URL 형식이 아닌 경우
-    if not (result_url.startswith("http://") or result_url.startswith("https://")):
-        print(f" URL 형식이 아닌 QR 데이터입니다: {result_url}")
+    # 예외 케이스 2: 콜론 기반 스킴이 있는데 http/https가 아닌 경우 거부
+    scheme_match = _ANY_SCHEME_PATTERN.match(result_url)
+    if scheme_match and not result_url.lower().startswith(_HTTP_SCHEMES):
+        print(f" http/https 이외의 스킴은 지원하지 않습니다: {result_url}")
         return None
 
+    # 예외 케이스 3: 스킴이 없는 경우, 최소한 도메인 형태인지 확인
+    if not scheme_match:
+        first_segment = result_url.split("/", 1)[0].split(":", 1)[0]
+        if "." not in first_segment or ";" in result_url or " " in result_url:
+            print(f" 도메인 형식이 아닌 QR 데이터입니다: {result_url}")
+            return None
+
     return result_url
-
-
-
 
 
 # 테스트

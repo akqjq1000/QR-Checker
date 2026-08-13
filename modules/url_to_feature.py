@@ -1,9 +1,7 @@
-"""QR에서 디코딩한 URL 문자열의 16개 정적 피처를 추출하는 모듈.
-
-이 파일의 계산식은 ``http://`` 또는 ``https://``가 없는 URL도 입력할 수
-있으며, 이 경우 URL을 분리할 때만 임시로 ``http://``를 붙입니다. 피처는
-원본 문자열을 기준으로 계산하므로 학습 데이터와 실제 QR 입력의 기준이
-달라지지 않습니다.
+"""피처 추출 모듈.
+입력 URL에 ``http://`` 또는 ``https://``가 있으면 ML 피처 계산 직전에
+제거. URL을 분리할 때만 임시로 ``//``를 붙여 도메인의 시작 위치를
+알려주며, 프로토콜을 제외한 학습 데이터와 실제 QR 입력의 기준을 맞춤.
 """
 
 from __future__ import annotations
@@ -14,7 +12,6 @@ from typing import Final
 from urllib.parse import ParseResult, urlparse
 
 from modules.schema import *
-
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
 _SCHEME_PATTERN: Final = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
@@ -32,36 +29,50 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
 )
 
 
-def _validate_url_text(url: str) -> str:
-    """URL 입력값을 검사하고 앞뒤 공백을 제거한 원본 문자열을 반환한다."""
+def normalize_url_for_features(url: str) -> str:
+    """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거.
+
+    URL 복구, 화면 표시, RAG, 웹 캡처 단계에서는 원본 URL을 그대로
+    사용하고, 학습 모델에 전달할 피처를 계산할 때만 이 함수를 사용한다.
+    """
 
     if not isinstance(url, str):
         raise TypeError("url은 문자열(str)이어야 합니다.")
 
-    cleaned_url = url.strip()
-    if not cleaned_url:
+    normalized_url = url.strip()
+    if not normalized_url:
         raise ValueError("url이 비어 있습니다.")
 
-    if any(character.isspace() for character in cleaned_url):
+    if any(character.isspace() for character in normalized_url):
         raise ValueError("url에는 공백 문자를 포함할 수 없습니다.")
 
-    # ftp://, mailto:// 등 HTTP(S)가 아닌 명시적 프로토콜은 분석하지 않는다.
-    scheme_match = _SCHEME_PATTERN.match(cleaned_url)
+    scheme_match = _SCHEME_PATTERN.match(normalized_url)
     if scheme_match:
-        scheme = cleaned_url.split(":", 1)[0].lower()
+        scheme = normalized_url.split(":", 1)[0].lower()
         if scheme not in _HTTP_SCHEMES:
             raise ValueError("http:// 또는 https:// URL만 지원합니다.")
 
-    return cleaned_url
+    return re.sub(
+        r"^https?://",
+        "",
+        normalized_url,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+
+def _validate_url_text(url: str) -> str:
+    """URL을 검사하고 ML 피처 계산용 문자열로 정규화한다."""
+
+    return normalize_url_for_features(url)
 
 
 def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
     """학습 전처리와 같은 방식으로 URL을 domain, path, query, port로 나눈다."""
 
-    # 프로토콜이 없는 QR URL은 파싱할 때만 임시 프로토콜을 사용
-    parse_target = cleaned_url
-    if not cleaned_url.lower().startswith(("http://", "https://")):
-        parse_target = f"http://{cleaned_url}"
+    # urlparse가 첫 부분을 경로가 아닌 도메인으로 인식하도록 파싱할 때만
+    # 임시로 //를 붙인다. cleaned_url 자체와 ML 피처에는 //가 포함되지 않는다.
+    parse_target = f"//{cleaned_url}"
 
     try:
         parsed = urlparse(parse_target)
@@ -80,7 +91,7 @@ def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
         path = f"/{clean_target.split('/', 1)[1]}" if "/" in clean_target else ""
         query = ""
         port = -1
-        parsed = urlparse(f"http://{domain}{path}")
+        parsed = urlparse(f"//{domain}{path}")
 
     if not domain:
         raise ValueError("URL에 도메인 또는 IP 주소가 없습니다.")
@@ -101,7 +112,7 @@ def _split_domain(domain: str) -> tuple[str, str, str]:
 
 
 def _calculate_entropy(text: str) -> float:
-    """URL 문자열의 Shannon entropy를 계산한다."""
+    """URL 문자열의 Shannon entropy를 계산."""
 
     if not text:
         return 0.0
@@ -109,7 +120,7 @@ def _calculate_entropy(text: str) -> float:
     length = len(text)
     entropy = 0.0
 
-    # ML팀 preprocess_data.py와 연산 순서까지 동일하게 계산합니다.
+    
     for character in set(text):
         probability = text.count(character) / length
         entropy += -probability * math.log(probability, 2)
@@ -118,11 +129,10 @@ def _calculate_entropy(text: str) -> float:
 
 
 def extract_features(url: str) -> FeatureVector:
-    """URL 하나를 받아 ML 학습 기준의 16개 피처를 반환한다.
+    """URL 하나를 받아 ML 학습 기준의 16개 피처를 반환.
 
-    프로토콜이 없는 ``example.com/path`` 형식도 지원. 프로토콜은
-    파싱용으로만 임시 추가되며, 모든 문자열 기반 피처는 입력 원문을 기준으로
-    계산.
+    프로토콜이 있는 URL과 없는 URL을 모두 지원하며, HTTP/HTTPS 프로토콜은
+    제거한 뒤 모든 문자열 기반 피처를 계산.
     """
 
     cleaned_url = _validate_url_text(url)
