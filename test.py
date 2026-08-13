@@ -1,11 +1,12 @@
 import streamlit as st
 from pathlib import Path
+import requests
 
 import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
 from modules.AI_RAG.rag_engine5 import RAGEngine
 from modules.url_to_feature import extract_features
-from modules.web_screenshot import capture_website # 잠시 비활성화
+# from modules.web_screenshot import capture_website # 잠시 비활성화
 from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
@@ -119,31 +120,41 @@ if st.session_state.scan_result:
 
     st.markdown("---")
     st.subheader("🔍 분석 대상")
-    # 임시 URL 화면 출력
-    st.info(f'추출된 URL: {url}')
 
     # 악성 URL의 경우 문제가 있을 수 있어서 임시 주석
     # 클릭 가능한 URL 버튼: 클릭 시 스크린샷 생성 및 미리보기
-    # if 'screenshot_path' not in st.session_state:
-    #     st.session_state.screenshot_path = None
     
-    # if st.button(url, key=f"preview_{url}"):
-    #     with st.spinner("웹페이지 미리보기 생성 중..."):
-    #         try:
-    #             result_path = capture_website(url)
-    #             if result_path:
-    #                 st.session_state.screenshot_path = result_path
-    #             else:
-    #                 st.session_state.screenshot_path = None
-    #                 st.error("웹페이지 미리보기를 생성하지 못했습니다.")
-    #         except Exception as e:
-    #             st.session_state.screenshot_path = None
-    #             st.error(f"미리보기 생성 중 오류: {e}")
+    if 'screenshot_path' not in st.session_state:
+        st.session_state.screenshot_path = None
 
-    # # 스크린샷이 생성되어 있으면 표시
-    # if st.session_state.get('screenshot_path'):
-    #     with st.expander("웹페이지 미리보기 (스크린샷)"):
-    #         st.image(st.session_state.screenshot_path, width='content')
+    st.write('#### 샌드박스 추출로 안전한 미리보기')
+    if st.button(url, key=f"preview_{url}"):
+        with st.spinner("웹페이지 미리보기 생성 중..."):
+            try:
+                response = requests.post('http://localhost:8000/capture/', headers={'Content-Type': 'application/json'}, json={'url': url})
+            
+                # 3. 요청 성공 시 이미지 파일로 저장 (헤더에서 파일명 추출)
+                if response.status_code == 200:
+                    # Content-Disposition 헤더에서 filename="파일명" 부분 추출
+                    cd = response.headers.get('Content-Disposition', '')
+                    file_name = cd.split('filename=')[1].strip('"') if 'filename=' in cd else "captured_image.png"
+                    
+                    with open(file_name, "wb") as f:
+                        f.write(response.content)
+                    
+                    st.session_state.screenshot_path = file_name
+                else:
+                    st.error(f"요청 실패 (상태 코드: {response.status_code})")
+                    st.session_state.screenshot_path = None
+
+            except Exception as e:
+                st.session_state.screenshot_path = None
+                st.error(f"미리보기 생성 중 오류: {e}")
+
+    # 스크린샷이 생성되어 있으면 표시
+    if st.session_state.get('screenshot_path'):
+        with st.expander("웹페이지 미리보기 (스크린샷)"):
+            st.image(st.session_state.screenshot_path, width='content')
 
     # 악성 의심 URL일 경우
     if detection.is_malicious:
