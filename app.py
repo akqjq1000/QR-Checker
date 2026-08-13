@@ -4,7 +4,7 @@ import streamlit as st
 import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
 from modules.url_to_feature import extract_features
-from modules.AI_RAG.rag_engine2 import RAGEngine
+from modules.AI_RAG.rag_engine5 import RAGEngine
 
 from modules.schema import AnalysisResult, ScanReport, FeatureVector
 
