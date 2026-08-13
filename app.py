@@ -1,10 +1,6 @@
 from pathlib import Path
 
 import streamlit as st
-#from modules import feature_extractor_dummy as feature_extractor
-# from modules import ml_detector_dummy as ml_detector
-# from modules import qr_decoder_dummy as qr_decoder
-# from modules import rag_engine_dummy as rag_engine
 import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
 from modules.url_to_feature import extract_features
