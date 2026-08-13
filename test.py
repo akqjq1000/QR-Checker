@@ -6,6 +6,7 @@ from modules.ml_detector import MaliciousURLDetector
 from modules.AI_RAG.rag_engine4 import RAGEngine
 from modules.url_to_feature import extract_features
 from modules.web_screenshot import capture_website
+from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
 st.title("QR-Checker")
 st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안내 프로그램 입니다.')
@@ -20,6 +21,7 @@ if 'chat_history' not in st.session_state:
 if 'chat_session_id' not in st.session_state:
     st.session_state.chat_session_id = None
 
+# 이미지 
 img = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
 analysis_btn = st.button('분석', type='primary')
 
@@ -36,22 +38,64 @@ if analysis_btn and img:
 
         if url:
             features = extract_features(url)
+            # Ensure features is FeatureVector
+            if not isinstance(features, FeatureVector):
+                try:
+                    features = FeatureVector(**features)
+                except Exception:
+                    pass
             ml_detector = MaliciousURLDetector()
             detection_result = ml_detector.predict(features=features)
+            # Ensure detection_result is DetectionResult
+            if not isinstance(detection_result, DetectionResult):
+                try:
+                    detection_result = DetectionResult(**detection_result)
+                except Exception:
+                    pass
 
-            # 스캔 결과를 세션에 저장
-            st.session_state.scan_result = {
-                "url": url,
-                "detection": detection_result,
-                "features": features
-            }
+            # 호출: 항상 RAG 엔진에 초기 스캔 요청을 전달하고 모듈이 반환하는 값을 그대로 사용
+            rag_response = st.session_state.rag_engine.init_scan(url, detection_result)
 
-            # 악성일 경우 RAG 엔진 초기화 (채팅 시작)
-            if detection_result.is_malicious:
-                rag_response = st.session_state.rag_engine.init_scan(url, detection_result)
-                st.session_state.chat_session_id = rag_response['session_id']
-                # 첫 번째 메시지(분석 결과 알림)를 채팅 기록에 추가
-                st.session_state.chat_history = [{"role": "assistant", "content": rag_response['message']}]
+            # Normalize possible return formats from modules (dict or tuple)
+            # Expected dict form: {"status": "completed"/"chat_required", ...}
+            # Expected tuple form: ('completed', AnalysisResult) or ('chat_required', session_id, message)
+            status = None
+            analysis = None
+            session_id = None
+            message = None
+
+            if isinstance(rag_response, dict):
+                status = rag_response.get('status')
+                if status == 'completed':
+                    analysis = rag_response.get('result')
+                elif status == 'chat_required':
+                    session_id = rag_response.get('session_id')
+                    message = rag_response.get('message')
+            elif isinstance(rag_response, (list, tuple)):
+                if len(rag_response) >= 1:
+                    status = rag_response[0]
+                    if status == 'completed' and len(rag_response) >= 2:
+                        analysis = rag_response[1]
+                    elif status == 'chat_required' and len(rag_response) >= 3:
+                        session_id = rag_response[1]
+                        message = rag_response[2]
+
+            # If analysis provided as dict, coerce to AnalysisResult
+            if analysis and not isinstance(analysis, AnalysisResult) and isinstance(analysis, dict):
+                try:
+                    analysis = AnalysisResult(**analysis)
+                except Exception:
+                    analysis = AnalysisResult(reason=str(analysis), countermeasures=[])
+
+            # Store ScanReport; if chat is required and no analysis yet, store analysis as None
+            st.session_state.scan_result = ScanReport(url=url, features=features, detection=detection_result, analysis=analysis)
+
+            if status == 'completed':
+                st.session_state.chat_session_id = None
+                st.session_state.chat_history = []
+            elif status == 'chat_required':
+                st.session_state.chat_session_id = session_id
+                st.session_state.chat_history = [{"role": "assistant", "content": message or "추가 정보가 필요합니다."}]
             else:
                 st.session_state.chat_session_id = None
                 st.session_state.chat_history = []
@@ -64,9 +108,9 @@ if analysis_btn and img:
 # 3. 결과 및 채팅 인터페이스 출력
 if st.session_state.scan_result:
     res = st.session_state.scan_result
-    url = res['url']
-    detection = res['detection']
-    features = res['features']
+    url = res.url
+    detection = res.detection
+    features = res.features
 
     st.markdown("---")
     st.subheader("🔍 분석 대상")
@@ -74,23 +118,24 @@ if st.session_state.scan_result:
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
 
-    if st.button(url, key=f"preview_{url}"):
-        with st.spinner("웹페이지 미리보기 생성 중..."):
-            try:
-                result_path = capture_website(url)
-                if result_path:
-                    st.session_state.screenshot_path = result_path
-                else:
-                    st.session_state.screenshot_path = None
-                    st.error("웹페이지 미리보기를 생성하지 못했습니다.")
-            except Exception as e:
-                st.session_state.screenshot_path = None
-                st.error(f"미리보기 생성 중 오류: {e}")
+    # 악성 URL의 경우 문제가 있을 수 있어서 임시 수정
+    # if st.button(url, key=f"preview_{url}"):
+    #     with st.spinner("웹페이지 미리보기 생성 중..."):
+    #         try:
+    #             result_path = capture_website(url)
+    #             if result_path:
+    #                 st.session_state.screenshot_path = result_path
+    #             else:
+    #                 st.session_state.screenshot_path = None
+    #                 st.error("웹페이지 미리보기를 생성하지 못했습니다.")
+    #         except Exception as e:
+    #             st.session_state.screenshot_path = None
+    #             st.error(f"미리보기 생성 중 오류: {e}")
 
-    # 스크린샷이 생성되어 있으면 표시
-    if st.session_state.get('screenshot_path'):
-        with st.expander("웹페이지 미리보기 (스크린샷)"):
-            st.image(st.session_state.screenshot_path, width='content')
+    # # 스크린샷이 생성되어 있으면 표시
+    # if st.session_state.get('screenshot_path'):
+    #     with st.expander("웹페이지 미리보기 (스크린샷)"):
+    #         st.image(st.session_state.screenshot_path, width='content')
 
     if detection.is_malicious:
         # 악성 판정 시 경고 메시지 출력
@@ -113,17 +158,59 @@ if st.session_state.scan_result:
                 # RAG 엔진을 통한 대화 처리
                 with st.spinner("AI 분석 중..."):
                     rag_response = st.session_state.rag_engine.chat(st.session_state.chat_session_id, user_input)
+
+                    # Normalize possible return formats (dict or tuple)
+                    c_status = None
+                    c_analysis = None
+                    c_message = None
+                    c_session = None
+
+                    if isinstance(rag_response, dict):
+                        c_status = rag_response.get('status')
+                        if c_status == 'completed':
+                            c_analysis = rag_response.get('result')
+                        else:
+                            c_message = rag_response.get('message')
+                    elif isinstance(rag_response, (list, tuple)):
+                        if len(rag_response) >= 1:
+                            c_status = rag_response[0]
+                            if c_status == 'completed' and len(rag_response) >= 2:
+                                c_analysis = rag_response[1]
+                            elif c_status == 'chat_required' and len(rag_response) >= 3:
+                                c_session = rag_response[1]
+                                c_message = rag_response[2]
                     
-                    if rag_response['status'] == 'completed':
-                        # 최종 결과 생성 및 기록 추가
-                        analysis = rag_response['result']
-                        final_msg = (f"**[최종 분석 결과]**\n\n{analysis.reason}\n\n"
-                                     f"**대응 지침:**\n• " + "\n• ".join(analysis.countermeasures))
+                    if c_status == 'completed' and c_analysis is not None:
+                        # coerce analysis if dict
+                        if not isinstance(c_analysis, AnalysisResult) and isinstance(c_analysis, dict):
+                            try:
+                                c_analysis = AnalysisResult(**c_analysis)
+                            except Exception:
+                                c_analysis = AnalysisResult(reason=str(c_analysis), countermeasures=[])
+
+                        # update stored ScanReport.analysis
+                        if isinstance(st.session_state.get('scan_result'), ScanReport):
+                            st.session_state.scan_result.analysis = c_analysis
+
+                        final_msg = (f"**[최종 분석 결과]**\n\n{c_analysis.reason}\n\n"
+                                     f"**대응 지침:**\n• " + "\n• ".join(c_analysis.countermeasures))
                         st.session_state.chat_history.append({"role": "assistant", "content": final_msg})
-                        st.session_state.chat_session_id = None # 세션 종료
+                        st.session_state.chat_session_id = None
+
+                    elif c_status == 'chat_required':
+                        # continue chat — append message if provided
+                        msg = c_message or rag_response if isinstance(rag_response, str) else c_message
+                        st.session_state.chat_history.append({"role": "assistant", "content": msg})
+                        # keep session id
+                        if c_session:
+                            st.session_state.chat_session_id = c_session
+
                     else:
-                        # 기타 상태 처리
-                        st.session_state.chat_history.append({"role": "assistant", "content": rag_response['message']})
+                        # error or unexpected
+                        msg = None
+                        if isinstance(rag_response, dict):
+                            msg = rag_response.get('message')
+                        st.session_state.chat_history.append({"role": "assistant", "content": msg or "응답 처리 중 오류가 발생했습니다."})
                 
                 st.rerun() # 화면 갱신을 위해 리런
 
