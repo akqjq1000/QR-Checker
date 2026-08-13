@@ -22,8 +22,8 @@ QR-Checker
 ├─models                    # 머신러닝 모델(URL 악성 여부 확인)
 ├─modules                   # 여러 기능 모음 디렉토리
 │ ├─AI_RAG                  # RAG 기능 모음
-├─sandbox                   # 웹 사이트 미리보기 기능을 위한 격리 환경
-│ ├─saved_images
+└─sandbox                   # 웹 사이트 미리보기 기능을 위한 격리 환경
+  └─saved_images
 ```
 
 ``` bash
