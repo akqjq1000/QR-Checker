@@ -7,7 +7,7 @@ from openai import APIError, APIConnectionError, RateLimitError
 # ---------------------------------------------------------
 # 1. 공통 스키마 파일에서 약속된 데이터 형식 불러오기
 # ---------------------------------------------------------
-from schema import DetectionResult, AnalysisResult
+from ..schema import DetectionResult, AnalysisResult
 
 # .env 파일에서 환경 변수 불러오기 (루트 경로 기준)
 load_dotenv()
