@@ -90,7 +90,7 @@ if st.session_state.scan_result:
     # 스크린샷이 생성되어 있으면 표시
     if st.session_state.get('screenshot_path'):
         with st.expander("웹페이지 미리보기 (스크린샷)"):
-            st.image(st.session_state.screenshot_path, use_column_width=True)
+            st.image(st.session_state.screenshot_path, width='content')
 
     if detection.is_malicious:
         # 악성 판정 시 경고 메시지 출력
