@@ -18,7 +18,7 @@ modules_path = os.path.join(current_dir, 'modules') # train_compare.py가 QR-Che
 sys.path.append(modules_path)
 
 try:
-    from schema import FEATURE_ORDER
+    from modules.schema import FEATURE_ORDER
 except ImportError:
     print("schema.py를 찾을 수 없습니다. 경로를 확인해주세요.")
     # 임시 우회 (나중에 문제가 없으면 실제 실행 시에는 지워도 됨)
