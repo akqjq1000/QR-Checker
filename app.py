@@ -16,8 +16,6 @@ st.set_page_config(page_title="QR-Shield", page_icon="")
 st.title("QR-Shield")
 
 DATA_DIR = Path(__file__).parent / "data"
-engine = RAGEngine()
-
 rag_engine = RAGEngine()
 
 # ===========================================================
@@ -113,6 +111,7 @@ if "chat_session_id" in st.session_state:
     if user_reply:
         result = rag_engine.chat(st.session_state["chat_session_id"], user_reply)
         _handle_rag_result(result)
+        st.rerun()
 
 if "last_report" in st.session_state:
     render_report(st.session_state["last_report"])
