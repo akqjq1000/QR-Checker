@@ -81,8 +81,8 @@ def main():
     # 3. 읽어온 파라미터로 모델 정의 (수정은 "tuned_parameters.json"에서 부탁들비니다)
     # ========================================================================
     models = {
-        # "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
-        # "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
+        "RandomForest": RandomForestClassifier(**MODEL_PARAMS["RandomForest_tuned"]),
+        "XGBoost": xgb.XGBClassifier(**MODEL_PARAMS["XGBoost_tuned"]),
         "LightGBM": lgb.LGBMClassifier(**MODEL_PARAMS["LightGBM"])
     }
 

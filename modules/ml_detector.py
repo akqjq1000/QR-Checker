@@ -95,7 +95,7 @@ if __name__ == "__main__":
         )
 
         # 실제 정답 추출
-        actual_label = int(sample_row['label'])
+        actual_label = 1 if sample_row['label'] == 'bad' else 0
         actual_status = "악성(1)" if actual_label == 1 else "정상(0)"
 
         # 5. 탐지기 객체 생성 및 예측
