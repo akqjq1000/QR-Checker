@@ -1,46 +1,107 @@
 """
-[단축 URL 원본 복구 모듈]
-단축 URL(bit.ly, tinyurl 등) → 리다이렉트를 따라가 최종 원본 URL 추출
+QR에서 추출된 URL의 리디렉트를 따라가 
+최종 목적지 URL을 반환하는 모듈.
+request 설치 필요
 
-[사용 라이브러리]
-requests: HTTP 요청 및 리다이렉트 자동 추적
-
-[함수 설명]
-get_original_url(url)
-  - 입력: 단축 URL 문자열
-  - 출력: 리다이렉트를 모두 따라간 최종 원본 URL (실패 시 None)
-  - 동작 방식: 단축 서비스는 접속 시 실제 내용 대신 "301/302 + Location
-    헤더(진짜 주소)"만 응답함. allow_redirects=True로 requests가 이
-    과정을 최종 200 응답이 나올 때까지 자동 반복 추적 -> response.url이
-    최종 도착 주소
-  - HEAD 요청 사용 이유: 최종 주소만 필요하고 페이지 내용은 필요 없으므로
-    GET보다 가벼운 HEAD로 요청
-  - timeout=10: 응답 없는 서버에 무한 대기 방지
-  - 예외 처리: 서버 무응답/존재하지 않는 도메인 등 어떤 오류든 None 반환
-    (파이프라인 규칙: 복구 실패 시 원래 단축 URL 그대로 사용)
-
-[결과]
-1) 직접 만든 단축 URL  -> 원본 URL 정상 반환
-2) 이미 원본인 URL  -> 입력과 동일하게 반환
-3) 존재하지 않는 도메인  -> None 반환
-4) URL 형식이 아닌 문자열  -> None 반환
+처리 흐름:
+    QR 디코딩 URL
+    → URL 형식 검사
+    → 프로토콜이 없으면 HTTPS 추가
+    → 리디렉트 추적
+    → 최종 URL 반환
+    → URL 피처 추출 모듈에 전달
 """
+
+from urllib.parse import urlsplit
+
 import requests
 
-def get_original_url(url):
-    try:
-        response = requests.head(
-            url,
-            allow_redirects=True,
-            timeout=10
+
+class URLResolutionError(Exception):
+    """URL 복구 과정에서 발생하는 예외입니다."""
+
+    pass
+
+
+def prepare_url(url):
+    """외부 요청에 사용할 수 있도록 URL을 검사하고 정리합니다."""
+
+    if not isinstance(url, str):
+        raise URLResolutionError("URL은 문자열이어야 합니다.")
+
+    url = url.strip()
+
+    if not url:
+        raise URLResolutionError("URL이 비어 있습니다.")
+
+    # 프로토콜이 없다면 HTTPS를 우선 사용
+    if "://" not in url:
+        url = f"https://{url}"
+
+    parsed = urlsplit(url)
+
+    if parsed.scheme.lower() not in {"http", "https"}:
+        raise URLResolutionError(
+            "HTTP 또는 HTTPS URL만 지원합니다."
         )
 
-        return response.url
+    if not parsed.hostname:
+        raise URLResolutionError(
+            "도메인이 없는 URL입니다."
+        )
 
-    except requests.RequestException:
-        return None
+    return url
 
+
+def resolve_url(url, max_redirects=5):
+    """리디렉트를 추적하여 최종 목적지 URL 문자열을 반환합니다."""
+
+    request_url = prepare_url(url)
+
+    session = requests.Session()
+    session.max_redirects = max_redirects
+    session.trust_env = False
+
+    try:
+        with session.get(
+            request_url,
+            allow_redirects=True,
+            stream=True,
+            timeout=(3, 5),
+            headers={
+                "User-Agent": "Q-Shield-URL-Resolver/1.0"
+            },
+        ) as response:
+
+            return response.url
+
+    except requests.TooManyRedirects as error:
+        raise URLResolutionError(
+            f"리디렉트가 {max_redirects}회를 초과했습니다."
+        ) from error
+
+    except requests.Timeout as error:
+        raise URLResolutionError(
+            "URL 확인 시간이 초과되었습니다."
+        ) from error
+
+    except requests.RequestException as error:
+        raise URLResolutionError(
+            f"URL 요청에 실패했습니다: {error}"
+        ) from error
+
+    finally:
+        session.close()
+
+
+# ==========================================
 # 테스트
-url = "https://zrr.kr/YiWTEb"  # 확인할 본인 url로 변경
-original_url = get_original_url(url)
-print("원본 URL:", original_url)
+# ==========================================
+
+if __name__ == "__main__":
+    url = "https://tinyurl.com/ynphet7f"  # 테스트 URL로 변경(원본:https://www.naver.com )
+
+    original_url = resolve_url(url)
+
+    print("입력 URL:", url)
+    print("원본 URL:", original_url)
