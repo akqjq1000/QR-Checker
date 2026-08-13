@@ -5,6 +5,7 @@ import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
 from modules.AI_RAG.rag_engine2 import RAGEngine
 from modules.url_to_feature import extract_features
+from modules.web_screenshot import capture_website
 
 st.title("QR-Checker")
 st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안내 프로그램 입니다.')
@@ -68,7 +69,28 @@ if st.session_state.scan_result:
     features = res['features']
 
     st.markdown("---")
-    st.subheader(f"🔍 분석 대상 URL: {url}")
+    st.subheader("🔍 분석 대상")
+    # 클릭 가능한 URL 버튼: 클릭 시 스크린샷 생성 및 미리보기
+    if 'screenshot_path' not in st.session_state:
+        st.session_state.screenshot_path = None
+
+    if st.button(url, key=f"preview_{url}"):
+        with st.spinner("웹페이지 미리보기 생성 중..."):
+            try:
+                result_path = capture_website(url)
+                if result_path:
+                    st.session_state.screenshot_path = result_path
+                else:
+                    st.session_state.screenshot_path = None
+                    st.error("웹페이지 미리보기를 생성하지 못했습니다.")
+            except Exception as e:
+                st.session_state.screenshot_path = None
+                st.error(f"미리보기 생성 중 오류: {e}")
+
+    # 스크린샷이 생성되어 있으면 표시
+    if st.session_state.get('screenshot_path'):
+        with st.expander("웹페이지 미리보기 (스크린샷)"):
+            st.image(st.session_state.screenshot_path, use_column_width=True)
 
     if detection.is_malicious:
         # 악성 판정 시 경고 메시지 출력

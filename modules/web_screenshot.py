@@ -64,7 +64,8 @@ def capture_website(url):
         print("웹사이트 캡처 실패:", e)
         return None
 
-# 테스트
-url = "https://www.naver.com/"  # 확인할 본인 url로 변경
-result = capture_website(url)
-print("캡처 결과:", result)
+if __name__ == "__main__":
+    # 테스트
+    url = "https://www.naver.com/"  # 확인할 본인 url로 변경
+    result = capture_website(url)
+    print("캡처 결과:", result)
