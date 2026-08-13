@@ -16,6 +16,7 @@ st.set_page_config(page_title="QR-Shield", page_icon="")
 st.title("QR-Shield")
 
 DATA_DIR = Path(__file__).parent / "data"
+engine = RAGEngine()
 
 rag_engine = RAGEngine()
 
