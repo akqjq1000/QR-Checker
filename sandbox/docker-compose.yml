@@ -1,0 +1,13 @@
+version: '3.9'
+
+services:
+  web-screenshot-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qr-checker-screenshot
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./saved_images:/app/saved_images
+    restart: unless-stopped

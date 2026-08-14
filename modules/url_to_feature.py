@@ -65,6 +65,10 @@ def _validate_url_text(url: str) -> str:
 
 
 def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
+    """학습 전처리와 같은 방식으로 URL을 domain, path, query, port로 나눈다."""
+
+    # urlparse가 첫 부분을 경로가 아닌 도메인으로 인식하도록 파싱할 때만
+    # 임시로 //를 붙인다. cleaned_url 자체와 ML 피처에는 //가 포함되지 않는다.
     parse_target = f"//{cleaned_url}"
 
     try:
@@ -78,6 +82,7 @@ def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
         except ValueError:
             port = -1
     except ValueError:
+        # 문자열을 기준으로 분리합니다.
         clean_target = re.sub(r"^https?://", "", cleaned_url, flags=re.IGNORECASE)
         domain = clean_target.split("/", 1)[0]
         path = f"/{clean_target.split('/', 1)[1]}" if "/" in clean_target else ""
@@ -118,6 +123,8 @@ _split_domain = split_domain
 
 
 def _calculate_entropy(text: str) -> float:
+    """URL 문자열의 Shannon entropy를 계산."""
+
     if not text:
         return 0.0
 
