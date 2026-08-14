@@ -35,6 +35,8 @@ if 'last_file_name' not in st.session_state: # 업로드 파일 이름
     st.session_state.last_file_name = None
 if 'enable_web_screenshot' not in st.session_state:
     st.session_state.enable_web_screenshot = True
+if 'is_already_known' not in st.session_state:
+    st.session_state.is_already_known = False
 
 if st.toggle('웹 미리보기 기능 활성화', value=st.session_state.enable_web_screenshot):
     st.session_state.enable_web_screenshot = True
@@ -117,6 +119,7 @@ if st.button('분석하기', type='primary') and img:
                     # 만약 악성 URL이라면 사용자와 2번의 채팅을 통해 RAG/파일 서치 + 웹 서치 진행
                     session_id = rag_response.get('session_id') # RAG 파트에서 사용할 세션 아이디
                     message = rag_response.get('message') # RAG 파트에서 제공해준 결과 메시지
+                    st.session_state.is_already_known = rag_response.get('is_already_known')
 
             # 응답 결과를 생성할 때 형식이 일치하지 않으면 강제로 맞추는 기능
             if analysis and not isinstance(analysis, AnalysisResult) and isinstance(analysis, dict):
@@ -156,7 +159,7 @@ if st.session_state.scan_result:
     st.success(f'URL 추출 성공: `{url}`')
 
     # 악성 URL이 DB에 등록 되어있을 때
-    if st.session_state.rag_engine.check_external_database(url):
+    if st.session_state.is_already_known:
         st.write(f':red[**▶  악성 URL로 이미 DB에 등록된 URL입니다.**]')
 
     if 'screenshot_path' not in st.session_state:
