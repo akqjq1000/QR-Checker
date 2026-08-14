@@ -164,6 +164,8 @@ class RAGEngine:
                 "result": AnalysisResult(reason="안전한 URL로 확인되었습니다.", countermeasures=["특이사항 없음"])
             }
 
+        status_tag = "{이미 검사한 악성 URL}" if is_db_bad else "{신규 악성 URL}"
+
         if not is_db_bad:
             self.register_malicious_url(url)
             
@@ -181,7 +183,7 @@ class RAGEngine:
         return {
             "status": "chat_required",
             "session_id": session_id,
-            "message": f"위험한 QR로 판정되었습니다! ({detection_result.confidence_score*100:.1f}%)\n해당 링크에 접속하셨나요? (예/아니오)"
+            "message": f"{status_tag} 위험한 QR로 판정되었습니다! ({detection_result.confidence_score*100:.1f}%)\n해당 링크에 접속하셨나요? (예/아니오)"
         }
 
     # ---------------------------------------------------------
@@ -209,7 +211,27 @@ class RAGEngine:
                 }
 
         elif current_state == "ASKED_ACTION":
-            prompt = f"사용자가 링크에 접속했으며, 다음 행동을 했습니다: {user_message}\n이에 맞는 강력한 사후 대응 지침을 주세요."
+            # 1. 사용자의 응답을 실제 행동으로 매핑하기 위한 딕셔너리
+            action_map = {
+                "1": "로그인/비밀번호 입력",
+                "2": "파일(.apk, .exe 등) 다운로드",
+                "3": "단순 접속만 한 뒤 닫음",
+                "4": "앱 설치 후 접근성 / 기기 관리자 권한 허용",
+                "5": "결제/송금/계좌정보 입력까지 진행",
+                "6": "카메라/문자/연락처 등 스마트폰 권한을 광범위하게 허용",
+                "7": "잘 모르겠음 / 기억이 안 남"
+            }
+            
+            # 2. 사용자가 숫자로 대답하는 경우 답변이 어려워질 수 있어서 직접 매핑함
+            action_text = user_message
+            for key, value in action_map.items():
+                # 만약 사용자가 "4", "4번이요" 등으로 대답했다면 해당 텍스트로 매핑
+                if key in user_message:
+                    action_text = value
+                    break
+
+            # 3. 매핑된 정확한 행동을 LLM에게 전달
+            prompt = f"사용자가 링크에 접속했으며, 다음 행동을 했습니다: {action_text}\n이에 맞는 강력한 사후 대응 지침을 주세요."
             return self._generate_final_guide(session_id, prompt)
 
         return {"status": "error", "message": "알 수 없는 상태입니다."}
@@ -277,7 +299,8 @@ class RAGEngine:
                 model="gpt-4o",
                 messages=messages,
                 tools=tools,
-                tool_choice="auto" 
+                tool_choice="auto",
+                response_format={"type": "json_object"}
             )
 
             response_message = response.choices[0].message
