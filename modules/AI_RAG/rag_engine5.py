@@ -164,7 +164,8 @@ class RAGEngine:
                 "result": AnalysisResult(reason="안전한 URL로 확인되었습니다.", countermeasures=["특이사항 없음"])
             }
 
-        status_tag = "{이미 검사한 악성 URL}" if is_db_bad else "{신규 악성 URL}"
+        # UI에서 직접 처리
+        # status_tag = "{이미 검사한 악성 URL}" if is_db_bad else "{신규 악성 URL}"
 
         if not is_db_bad:
             self.register_malicious_url(url)
@@ -183,7 +184,8 @@ class RAGEngine:
         return {
             "status": "chat_required",
             "session_id": session_id,
-            "message": f"{status_tag} 위험한 QR로 판정되었습니다! ({detection_result.confidence_score*100:.1f}%)\n해당 링크에 접속하셨나요? (예/아니오)"
+            "is_already_known": is_db_bad, # UI 처리용 True/False 값
+            "message": f"위험한 QR로 판정되었습니다! ({detection_result.confidence_score*100:.1f}%)\n해당 링크에 접속하셨나요? (예/아니오)"
         }
 
     # ---------------------------------------------------------
