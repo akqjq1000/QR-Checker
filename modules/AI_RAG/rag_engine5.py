@@ -23,7 +23,7 @@ sys.path.append(os.path.abspath(os.path.join(current_dir, "../../")))
 #############################################################
 
 from ..ml_detector import MaliciousURLDetector
-from ..schema import AnalysisResult, DetectionResult, FeatureVector
+from ..schema import AnalysisResult, DetectionResult
 from ..url_to_feature import extract_features
 
 load_dotenv()
@@ -35,7 +35,7 @@ sessions = {}
 
 
 class RAGEngine:
-    def __init__(self):
+    def __init__(self, ml_detector: MaliciousURLDetector | None = None):
         if not os.getenv("OPENAI_API_KEY"):
             raise ValueError("OPENAI_API_KEY가 설정되지 않았습니다.")
 
@@ -61,11 +61,14 @@ class RAGEngine:
         self.searched_queries = set()
 
         # 4. ML 탐지기 객체 초기화
-        try:
-            self.ml_detector = MaliciousURLDetector("lgbm")
-        except Exception as e:
-            print(f"[ML_Detector] 초기화 실패: {e}")
-            self.ml_detector = None
+        if ml_detector is not None:
+            self.ml_detector = ml_detector
+        else:
+            try:
+                self.ml_detector = MaliciousURLDetector("xgboost")
+            except Exception as e:
+                print(f"[ML_Detector] 초기화 실패: {e}")
+                self.ml_detector = None
 
     # ---------------------------------------------------------
     # [사용자 DB 연동 기능]

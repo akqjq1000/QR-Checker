@@ -61,7 +61,8 @@ def render_report(report: ScanReport) -> None:
 def analyze_url(url: str) -> None:
     """URL을 받아 피처 추출·탐지까지 수행하고, RAG 상담 세션을 시작."""
     features = extract_features(url)
-    ml_detector = MaliciousURLDetector()
+    ml_detector = MaliciousURLDetector(model_type="rf")     # "xgboost" / "rf", "randomforest", "random forest" / "lgbm", "lightgbm"
+    rag_engine = RAGEngine(ml_detector=ml_detector)
     # detection = ml_detector.predict(features=features)
     detection = ml_detector.predict_url(url)
     st.session_state["pending"] = {
