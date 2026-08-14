@@ -14,10 +14,16 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.abspath(os.path.join(current_dir, "../")))
 sys.path.append(os.path.abspath(os.path.join(current_dir, "../../")))
 
-# ✅ 팀원이 만든 ML 탐지기 및 피처 추출 함수 가져오기 완성
-from schema import DetectionResult, AnalysisResult, FeatureVector
-from ml_detector import MaliciousURLDetector
-from url_to_feature import extract_features  
+############################ 원본 ############################
+# # ✅ 팀원이 만든 ML 탐지기 및 피처 추출 함수 가져오기 완성
+# from schema import DetectionResult, AnalysisResult, FeatureVector
+# from ml_detector import MaliciousURLDetector
+# from url_to_feature import extract_features  
+#############################################################
+
+from ..schema import DetectionResult, AnalysisResult, FeatureVector
+from ..ml_detector import MaliciousURLDetector
+from ..url_to_feature import extract_features
 
 load_dotenv()
 
