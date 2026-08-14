@@ -11,6 +11,8 @@ import re
 from typing import Final
 from urllib.parse import ParseResult, urlparse
 
+import tldextract
+
 from .schema import *
 
 
@@ -31,11 +33,7 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
 
 
 def normalize_url_for_features(url: str) -> str:
-    """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거.
-
-    URL 복구, 화면 표시, RAG, 웹 캡처 단계에서는 원본 URL을 그대로
-    사용하고, 학습 모델에 전달할 피처를 계산할 때만 이 함수를 사용한다.
-    """
+    """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거."""
 
     if not isinstance(url, str):
         raise TypeError("url은 문자열(str)이어야 합니다.")
@@ -63,16 +61,10 @@ def normalize_url_for_features(url: str) -> str:
 
 
 def _validate_url_text(url: str) -> str:
-    """URL을 검사하고 ML 피처 계산용 문자열로 정규화한다."""
-
     return normalize_url_for_features(url)
 
 
 def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
-    """학습 전처리와 같은 방식으로 URL을 domain, path, query, port로 나눈다."""
-
-    # urlparse가 첫 부분을 경로가 아닌 도메인으로 인식하도록 파싱할 때만
-    # 임시로 //를 붙인다. cleaned_url 자체와 ML 피처에는 //가 포함되지 않는다.
     parse_target = f"//{cleaned_url}"
 
     try:
@@ -86,7 +78,6 @@ def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
         except ValueError:
             port = -1
     except ValueError:
-        # 문자열을 기준으로 분리합니다.
         clean_target = re.sub(r"^https?://", "", cleaned_url, flags=re.IGNORECASE)
         domain = clean_target.split("/", 1)[0]
         path = f"/{clean_target.split('/', 1)[1]}" if "/" in clean_target else ""
@@ -100,28 +91,39 @@ def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
     return parsed, domain, path, query, port
 
 
-def _split_domain(domain: str) -> tuple[str, str, str]:
-    """단순 점 분리 방식으로 도메인을 나눈다."""
+def split_domain(domain: str) -> tuple[str, str, str]:
+    """tldextract(Public Suffix List) 기반으로 domain을 (subdomain, root_domain, suffix)로 나눈다.
 
-    parts = domain.split(".")
+    기존에는 단순 점(.) 분리였으나, wikipedia.co.kr처럼 복합 suffix를
+    가진 도메인을 잘못 자르는 문제가 있어 tldextract로 교체함.
+    domain_similarity.py의 화이트리스트 매칭도 이 함수를 그대로 재사용해서
+    root domain 계산 기준을 프로젝트 전체에서 하나로 통일한다.
+    """
+    ext = tldextract.extract(domain)
 
-    if len(parts) > 2:
-        return ".".join(parts[:-2]), parts[-2], parts[-1]
-    if len(parts) == 2:
-        return "", parts[0], parts[1]
-    return "", domain, ""
+    if not ext.domain:
+        # tldextract가 인식 못한 경우(순수 IP 등) 폴백
+        parts = domain.split(".")
+        if len(parts) > 2:
+            return ".".join(parts[:-2]), parts[-2], parts[-1]
+        if len(parts) == 2:
+            return "", parts[0], parts[1]
+        return "", domain, ""
+
+    return ext.subdomain, ext.domain, ext.suffix
+
+
+# 기존 내부 호출부 및 하위 호환용 별칭
+_split_domain = split_domain
 
 
 def _calculate_entropy(text: str) -> float:
-    """URL 문자열의 Shannon entropy를 계산."""
-
     if not text:
         return 0.0
 
     length = len(text)
     entropy = 0.0
 
-    
     for character in set(text):
         probability = text.count(character) / length
         entropy += -probability * math.log(probability, 2)
@@ -130,7 +132,7 @@ def _calculate_entropy(text: str) -> float:
 
 
 def extract_features(url: str) -> FeatureVector:
-    """URL 하나를 받아 ML 학습 기준의 16개 피처를 반환.
+    """URL 하나를 받아 ML 학습 기준의 17개 피처를 반환.
 
     프로토콜이 있는 URL과 없는 URL을 모두 지원하며, HTTP/HTTPS 프로토콜은
     제거한 뒤 모든 문자열 기반 피처를 계산.
@@ -138,7 +140,7 @@ def extract_features(url: str) -> FeatureVector:
 
     cleaned_url = _validate_url_text(url)
     _, domain, path, query, port = _parse_url(cleaned_url)
-    sub_domain, root_domain, suffix = _split_domain(domain)
+    sub_domain, root_domain, suffix = split_domain(domain)
 
     is_ip = bool(_IPV4_PATTERN.fullmatch(domain.split(":", 1)[0]))
     is_private = bool(
@@ -177,10 +179,9 @@ def extract_features(url: str) -> FeatureVector:
     return features
 
 
-
 extract = extract_features
 
-''' 테스트'''
+'''테스트'''
 if __name__ == "__main__":
     sample_url = "g00gle-login.com:8080/verify?id=123"
     sample_features = extract_features(sample_url)
