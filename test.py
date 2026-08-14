@@ -27,6 +27,13 @@ if 'chat_session_id' not in st.session_state: # OpenAI 채팅 세션
     st.session_state.chat_session_id = None
 if 'last_file_name' not in st.session_state: # 업로드 파일 이름
     st.session_state.last_file_name = None
+if 'enable_web_screenshot' not in st.session_state:
+    st.session_state.enable_web_screenshot = True
+
+if st.toggle('웹 미리보기 기능 활성화', value=st.session_state.enable_web_screenshot):
+    st.session_state.enable_web_screenshot = True
+else:
+    st.session_state.enable_web_screenshot = False
 
 # 이미지 업로드
 img = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
@@ -135,40 +142,43 @@ if st.session_state.scan_result:
     st.markdown("---")
     st.subheader("🔍 분석 대상")
 
+    st.write('추출된 URL:', url, unsafe_allow_html=True)
+
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
 
-    st.write('#### 샌드박스 추출로 안전한 미리보기')
-    if st.button(url, key=f"preview_{url}", disabled=(st.session_state.screenshot_path != None)):
-        with st.spinner("웹페이지 미리보기 생성 중..."):
-            try:
-                response = requests.post('http://localhost:8000/capture/', headers={'Content-Type': 'application/json'}, json={'url': url})
-            
-                # 3. 요청 성공 시 이미지 파일로 저장 (헤더에서 파일명 추출)
-                if response.status_code == 200:
-                    # Content-Disposition 헤더에서 filename="파일명" 부분 추출
-                    cd = response.headers.get('Content-Disposition', '')
-                    file_name = cd.split('filename=')[1].strip('"') if 'filename=' in cd else "captured_image.png"
-                    # 이미지 저장 경로 지정
-                    SITE_IMAGE_DIR = Path(__file__).parent / 'data/site-image'
-                    site_image_path = SITE_IMAGE_DIR / file_name
+    if st.session_state.enable_web_screenshot:
+        st.write('#### 샌드박스 추출로 안전한 미리보기')
+        if st.button(url, key=f"preview_{url}", disabled=(st.session_state.screenshot_path != None)):
+            with st.spinner("웹페이지 미리보기 생성 중..."):
+                try:
+                    response = requests.post('http://localhost:8000/capture/', headers={'Content-Type': 'application/json'}, json={'url': url})
+                
+                    # 3. 요청 성공 시 이미지 파일로 저장 (헤더에서 파일명 추출)
+                    if response.status_code == 200:
+                        # Content-Disposition 헤더에서 filename="파일명" 부분 추출
+                        cd = response.headers.get('Content-Disposition', '')
+                        file_name = cd.split('filename=')[1].strip('"') if 'filename=' in cd else "captured_image.png"
+                        # 이미지 저장 경로 지정
+                        SITE_IMAGE_DIR = Path(__file__).parent / 'data/site-image'
+                        site_image_path = SITE_IMAGE_DIR / file_name
 
-                    with open(site_image_path, "wb") as f:
-                        f.write(response.content)
-                    
-                    st.session_state.screenshot_path = site_image_path # 이미지 저장 경로 저장
-                else:
-                    st.error(f"요청 실패 (상태 코드: {response.status_code})")
+                        with open(site_image_path, "wb") as f:
+                            f.write(response.content)
+                        
+                        st.session_state.screenshot_path = site_image_path # 이미지 저장 경로 저장
+                    else:
+                        st.error(f"요청 실패 (상태 코드: {response.status_code})")
+                        st.session_state.screenshot_path = None
+
+                except Exception as e:
                     st.session_state.screenshot_path = None
+                    st.error(f"미리보기 생성 중 오류: {e}")
 
-            except Exception as e:
-                st.session_state.screenshot_path = None
-                st.error(f"미리보기 생성 중 오류: {e}")
-
-    # 스크린샷이 생성되어 있으면 표시
-    if st.session_state.get('screenshot_path'):
-        with st.expander("웹페이지 미리보기 (스크린샷)", expanded=True):
-            st.image(st.session_state.screenshot_path, width='content')
+        # 스크린샷이 생성되어 있으면 표시
+        if st.session_state.get('screenshot_path'):
+            with st.expander("웹페이지 미리보기 (스크린샷)", expanded=True):
+                st.image(st.session_state.screenshot_path, width='content')
 
     # 악성 의심 URL일 경우
     if detection.is_malicious:
