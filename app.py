@@ -10,21 +10,12 @@ from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
-if 'rag_engine' not in st.session_state: # RAG 엔진
-    with st.spinner('RAG 엔진 로드 중...'):
-        st.session_state.rag_engine = RAGEngine()
-if 'ml_detector' not in st.session_state: # ML 검사기
-    # 모델 종류
-    # AVAILABLE_MODELS = {
-    #         'xgboost': 'XGBoost_classifier.pkl',
-    #         'rf': 'RandomForest_classifier.pkl',
-    #         'randomforest': 'RandomForest_classifier.pkl',
-    #         'random forest': 'RandomForest_classifier.pkl',
-    #         'lgbm': 'LightGBM_classifier.pkl',
-    #         'lightgbm': 'LightGBM_classifier.pkl'
-    #     }
+if 'ml_detector' not in st.session_state:
     with st.spinner('모델 로드 중...'):
-        st.session_state.ml_detector = MaliciousURLDetector('rf')
+        st.session_state.ml_detector = MaliciousURLDetector('rf')   # xgboost, rf, randomforest, random forest, lgbm, lightgbm
+if 'rag_engine' not in st.session_state:
+    with st.spinner('RAG 엔진 로드 중...'):
+        st.session_state.rag_engine = RAGEngine(ml_detector=st.session_state.ml_detector)
 if 'scan_result' not in st.session_state: # 검사 결과
     st.session_state.scan_result = None
 if 'chat_history' not in st.session_state: # 채팅 기록
@@ -92,7 +83,7 @@ if st.button('분석하기', type='primary') and img:
                 except Exception:
                     pass
             # 추출된 피처 넣어서 악성 코드인지 검토
-            detection_result = st.session_state.ml_detector.predict(features=features)
+            detection_result = st.session_state.ml_detector.predict_url(url)
 
             # 결과값 검증
             if not isinstance(detection_result, DetectionResult):
