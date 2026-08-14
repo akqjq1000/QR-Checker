@@ -43,6 +43,9 @@ class FeatureVector:
     ratio_alpha_numeric: float  # URL 내 알파벳 대비 숫자 비율
     value_entropy_url: float    # URL 문자열의 엔트로피(복잡도)
 
+    # --- 도메인 유사도 (타이포스쿼팅 탐지) ---
+    domain_similarity: float    # 화이트리스트 도메인과의 편집거리 기반 유사도 (0=동일, 1=완전 다름)
+
     def to_dict(self) -> dict:
         """JSON 직렬화 및 API 응답용."""
         return asdict(self)
@@ -73,6 +76,7 @@ FEATURE_ORDER = [
     "num_port",
     "ratio_alpha_numeric",
     "value_entropy_url",
+    "domain_similarity",
 ]
 
 
