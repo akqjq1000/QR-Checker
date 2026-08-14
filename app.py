@@ -155,6 +155,10 @@ if st.session_state.scan_result:
 
     st.success(f'URL 추출 성공: `{url}`')
 
+    # 악성 URL이 DB에 등록 되어있을 때
+    if st.session_state.rag_engine.check_external_database(url):
+        st.write(f':red[**▶  악성 URL로 이미 DB에 등록된 URL입니다.**]')
+
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
 
