@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,14 +16,13 @@ def load_whitelist() -> set:
 
 # 스킴이 있는 URL이 오면 안 됨
 def extract_root_domain(url_or_domain: str) -> str:
-    """url_to_feature.split_domain을 재사용해 root domain(root+suffix)을 구한다.
-
-    순환 참조 방지를 위해 함수 내부에서 지연 임포트한다
-    (url_to_feature.py도 이 모듈을 import하기 때문).
-    """
+    """url_to_feature.split_domain을 재사용해 root domain(root+suffix)을 구한다."""
     from .url_to_feature import split_domain
 
-    domain = url_or_domain.split("/", 1)[0].split(":", 1)[0]
+    # 스킴(http://, https://) 제거 - 방어적으로 처리
+    domain = re.sub(r"^https?://", "", url_or_domain, flags=re.IGNORECASE)
+    domain = domain.split("/", 1)[0].split(":", 1)[0]
+
     _, root, suffix = split_domain(domain)
     if not root:
         return ""

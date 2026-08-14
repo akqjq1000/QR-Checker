@@ -5,6 +5,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from .domain_similarity import extract_root_domain, load_whitelist
 from .schema import DetectionResult, FeatureVector
 from .url_to_feature import extract_features
 
@@ -55,7 +56,14 @@ class MaliciousURLDetector:
         )
 
     def predict_url(self, url: str) -> DetectionResult:
-        """URL 문자열을 직접 입력받아 피처 추출 후 예측까지 한 번에 수행"""
+        """URL 문자열을 직접 입력받아 피처 추출 후 예측까지 한 번에 수행.
+
+        화이트리스트 도메인과 완전히 일치하면 ML 추론 없이 즉시 안전 판정.
+        """
+        root = extract_root_domain(url)
+        if root in load_whitelist():
+            return DetectionResult(is_malicious=False, confidence_score=0.0)
+
         features = extract_features(url)
         return self.predict(features)
 
