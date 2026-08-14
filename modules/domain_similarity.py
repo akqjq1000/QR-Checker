@@ -1,6 +1,7 @@
-from pathlib import Path
 from functools import lru_cache
-from rapidfuzz import process, fuzz
+from pathlib import Path
+
+from rapidfuzz import fuzz, process
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 WHITELIST_PATH = BASE_DIR / "data" / "whitelist.txt"
@@ -9,7 +10,7 @@ WHITELIST_PATH = BASE_DIR / "data" / "whitelist.txt"
 @lru_cache(maxsize=1)
 def load_whitelist() -> set:
     with open(WHITELIST_PATH, encoding="utf-8") as f:
-        return set(line.strip() for line in f if line.strip())
+        return {line.strip() for line in f if line.strip()}
 
 
 # 스킴이 있는 URL이 오면 안 됨
@@ -28,7 +29,7 @@ def extract_root_domain(url_or_domain: str) -> str:
     return f"{root}.{suffix}" if suffix else root
 
 
-def min_distance_to_whitelist(root_domain: str, whitelist: set = None) -> float:
+def min_distance_to_whitelist(root_domain: str, whitelist: set | None = None) -> float:
     """
     화이트리스트 중 가장 비슷한 도메인과의 '다른 비율' 반환 (0=완전 일치, 1=완전 다름)
     """

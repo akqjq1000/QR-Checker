@@ -13,9 +13,8 @@ from urllib.parse import ParseResult, urlparse
 
 import tldextract
 
+from .domain_similarity import load_whitelist, min_distance_to_whitelist
 from .schema import *
-from .domain_similarity import min_distance_to_whitelist, load_whitelist
-
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
 _SCHEME_PATTERN: Final = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
@@ -33,6 +32,7 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
 )
 
 _WHITELIST = load_whitelist()
+
 
 def normalize_url_for_features(url: str) -> str:
     """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거."""
@@ -135,7 +135,7 @@ def _calculate_entropy(text: str) -> float:
 
     for character in set(text):
         probability = text.count(character) / length
-        entropy += -probability * math.log(probability, 2)
+        entropy += -probability * math.log2(probability)
 
     return float(entropy)
 
@@ -152,10 +152,7 @@ def extract_features(url: str) -> FeatureVector:
     sub_domain, root_domain, suffix = split_domain(domain)
 
     is_ip = bool(_IPV4_PATTERN.fullmatch(domain.split(":", 1)[0]))
-    is_private = bool(
-        is_ip
-        and domain.startswith(("192.168.", "10.", "172."))
-    )
+    is_private = bool(is_ip and domain.startswith(("192.168.", "10.", "172.")))
 
     alnum_count = len(_ASCII_ALNUM_PATTERN.findall(cleaned_url))
 
@@ -180,9 +177,7 @@ def extract_features(url: str) -> FeatureVector:
         is_private=is_private,
         is_filter=any(word in cleaned_url.lower() for word in _FILTER_WORDS),
         num_port=port,
-        ratio_alpha_numeric=(
-            alnum_count / len(cleaned_url) if cleaned_url else 0.0
-        ),
+        ratio_alpha_numeric=(alnum_count / len(cleaned_url) if cleaned_url else 0.0),
         value_entropy_url=_calculate_entropy(cleaned_url),
         domain_similarity=domain_similarity,
     )
@@ -197,7 +192,7 @@ def extract_features(url: str) -> FeatureVector:
 
 extract = extract_features
 
-'''테스트'''
+"""테스트"""
 if __name__ == "__main__":
     sample_url = "g00gle-login.com:8080/verify?id=123"
     sample_features = extract_features(sample_url)

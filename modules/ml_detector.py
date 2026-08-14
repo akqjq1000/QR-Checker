@@ -1,15 +1,17 @@
 import os
+import random  # 데이터셋에서 랜덤하게 데이터를 뽑아오기 위함
+
 import joblib
 import numpy as np
 import pandas as pd
-from .schema import FeatureVector, DetectionResult
+
+from .schema import DetectionResult, FeatureVector
 from .url_to_feature import extract_features
-import random  # 데이터셋에서 랜덤하게 데이터를 뽑아오기 위함
 
 
 class MaliciousURLDetector:
     # 테스트해보고자 하는 모델을 딕셔너리로 저장
-    AVAILABLE_MODELS = {
+    AVAILABLE_MODELS = {  # noqa: RUF012
         "xgboost": "XGBoost_classifier.pkl",
         "rf": "RandomForest_classifier.pkl",
         "randomforest": "RandomForest_classifier.pkl",
@@ -89,7 +91,7 @@ def test_random_sample(detector: MaliciousURLDetector, df: pd.DataFrame) -> None
     result = detector.predict(sample_features)
     predicted_status = "악성(1)" if result.is_malicious else "정상(0)"
 
-    print(f"\n[데이터셋 샘플 테스트]")
+    print("\n[데이터셋 샘플 테스트]")
     print(
         f"실제: {actual_status} / 예측: {predicted_status} (확률 {result.confidence_score:.4f})"
     )
@@ -106,7 +108,7 @@ def test_manual_url(detector: MaliciousURLDetector) -> None:
         status = "악성(1)" if result.is_malicious else "정상(0)"
         print(f"URL: {url}")
         print(f"판정: {status} (악성 확률 {result.confidence_score:.4f})")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"[오류] URL 처리 중 문제 발생: {e}")
 
 

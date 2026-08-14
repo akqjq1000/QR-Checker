@@ -1,4 +1,9 @@
-from .domain_similarity import extract_root_domain, min_distance_to_whitelist, load_whitelist
+from .domain_similarity import (
+    extract_root_domain,
+    load_whitelist,
+    min_distance_to_whitelist,
+)
+
 
 def test():
     wl = load_whitelist()
@@ -15,9 +20,12 @@ def test():
         dist = min_distance_to_whitelist(root, wl)
         print(f"{url:25s} -> root={root:20s} dist={dist}")
         if expected is not None:
-            assert abs(dist - expected) < 1e-6, f"FAIL: {url} expected {expected}, got {dist}"
+            assert abs(dist - expected) < 1e-6, (
+                f"FAIL: {url} expected {expected}, got {dist}"
+            )
 
     print("PASS (goog1e.com 결과는 위 출력에서 눈으로 확인)")
+
 
 if __name__ == "__main__":
     test()
