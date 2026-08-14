@@ -2,8 +2,6 @@ from pathlib import Path
 from functools import lru_cache
 from rapidfuzz import process, fuzz
 
-from .url_to_feature import split_domain  # root domain 계산의 단일 소스 (재사용)
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 WHITELIST_PATH = BASE_DIR / "data" / "whitelist.txt"
 
@@ -18,9 +16,11 @@ def load_whitelist() -> set:
 def extract_root_domain(url_or_domain: str) -> str:
     """url_to_feature.split_domain을 재사용해 root domain(root+suffix)을 구한다.
 
-    자체적으로 tldextract를 다시 호출하지 않고, 프로젝트 전체에서
-    root domain을 계산하는 유일한 소스인 split_domain의 결과를 그대로 씀.
+    순환 참조 방지를 위해 함수 내부에서 지연 임포트한다
+    (url_to_feature.py도 이 모듈을 import하기 때문).
     """
+    from .url_to_feature import split_domain
+
     domain = url_or_domain.split("/", 1)[0].split(":", 1)[0]
     _, root, suffix = split_domain(domain)
     if not root:

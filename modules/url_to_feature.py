@@ -14,6 +14,7 @@ from urllib.parse import ParseResult, urlparse
 import tldextract
 
 from .schema import *
+from .domain_similarity import min_distance_to_whitelist, load_whitelist
 
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
@@ -31,6 +32,7 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
     "update",
 )
 
+_WHITELIST = load_whitelist()
 
 def normalize_url_for_features(url: str) -> str:
     """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거."""
@@ -157,6 +159,12 @@ def extract_features(url: str) -> FeatureVector:
 
     alnum_count = len(_ASCII_ALNUM_PATTERN.findall(cleaned_url))
 
+    # 화이트리스트와의 도메인 유사도 (IP 주소는 개념상 무의미하므로 0.0 고정)
+    root_for_similarity = f"{root_domain}.{suffix}" if suffix else root_domain
+    domain_similarity = (
+        0.0 if is_ip else min_distance_to_whitelist(root_for_similarity, _WHITELIST)
+    )
+
     features = FeatureVector(
         len_url=len(cleaned_url),
         len_sub_domain=len(sub_domain),
@@ -176,6 +184,7 @@ def extract_features(url: str) -> FeatureVector:
             alnum_count / len(cleaned_url) if cleaned_url else 0.0
         ),
         value_entropy_url=_calculate_entropy(cleaned_url),
+        domain_similarity=domain_similarity,
     )
 
     if list(features.to_dict()) != FEATURE_ORDER:
