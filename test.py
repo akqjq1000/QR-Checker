@@ -15,18 +15,34 @@ st.title("QR-Checker")
 st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안내 프로그램 입니다.')
 
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
-if 'rag_engine' not in st.session_state:
+if 'rag_engine' not in st.session_state: # RAG 엔진
     st.session_state.rag_engine = RAGEngine()
-if 'scan_result' not in st.session_state:
+if 'ml_detector' not in st.session_state: # ML 검사기
+    st.session_state.ml_detector = MaliciousURLDetector()
+if 'scan_result' not in st.session_state: # 검사 결과
     st.session_state.scan_result = None
-if 'chat_history' not in st.session_state:
+if 'chat_history' not in st.session_state: # 채팅 기록
     st.session_state.chat_history = []
-if 'chat_session_id' not in st.session_state:
+if 'chat_session_id' not in st.session_state: # OpenAI 채팅 세션
     st.session_state.chat_session_id = None
+if 'last_file_name' not in st.session_state: # 업로드 파일 이름
+    st.session_state.last_file_name = None
 
 # 이미지 업로드
 img = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
-analysis_btn = st.button('분석', type='primary')
+
+# 이미지를 변경하거나 지울 때
+if img is not None:
+    if st.session_state.last_file_name != img.name:
+        st.session_state.last_file_name = img.name
+        st.session_state.scan_result = None
+        st.session_state.screenshot_path = None
+else:
+    st.session_state.last_file_name = None
+    st.session_state.scan_result = None
+    st.session_state.screenshot_path = None
+
+analysis_btn = st.button('분석하기', type='primary')
 
 # 2. 분석 로직 (버튼 클릭 시 실행)
 if analysis_btn and img:
@@ -55,10 +71,8 @@ if analysis_btn and img:
                     features = FeatureVector(**features) # 피처 변수를 다시 등록하여 정상 적인 피처 변수로 변환
                 except Exception:
                     pass
-            # 머신러닝 검사기
-            ml_detector = MaliciousURLDetector()
             # 추출된 피처 넣어서 악성 코드인지 검토
-            detection_result = ml_detector.predict(features=features)
+            detection_result = st.session_state.ml_detector.predict(features=features)
 
             # 결과값 검증
             if not isinstance(detection_result, DetectionResult):
@@ -121,14 +135,11 @@ if st.session_state.scan_result:
     st.markdown("---")
     st.subheader("🔍 분석 대상")
 
-    # 악성 URL의 경우 문제가 있을 수 있어서 임시 주석
-    # 클릭 가능한 URL 버튼: 클릭 시 스크린샷 생성 및 미리보기
-    
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
 
     st.write('#### 샌드박스 추출로 안전한 미리보기')
-    if st.button(url, key=f"preview_{url}"):
+    if st.button(url, key=f"preview_{url}", disabled=(st.session_state.screenshot_path != None)):
         with st.spinner("웹페이지 미리보기 생성 중..."):
             try:
                 response = requests.post('http://localhost:8000/capture/', headers={'Content-Type': 'application/json'}, json={'url': url})
