@@ -226,3 +226,4 @@ models/*.pkl
 data/*.csv
 data/*.json
 !data/whitelist.txt
+!data/train_urls.csv
