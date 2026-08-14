@@ -2,8 +2,8 @@ import os
 import joblib 
 import numpy as np 
 import pandas as pd 
-from schema import FeatureVector, DetectionResult 
-from url_to_feature import extract_features
+from .schema import FeatureVector, DetectionResult
+from .url_to_feature import extract_features
 import random   # 데이터셋에서 랜덤하게 데이터를 뽑아오기 위함 
 
 class MaliciousURLDetector: 
