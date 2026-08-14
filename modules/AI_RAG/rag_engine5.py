@@ -205,7 +205,7 @@ class RAGEngine:
                 return {
                     "status": "chat_required",
                     "session_id": session_id,
-                    "message": "어떤 페이지였거나, 어떤 행동을 하셨나요?\n1. 로그인/비밀번호 입력\n2. 파일(.apk, .exe 등) 다운로드\n3. 단순 접속만 한 뒤 닫음"
+                    "message": "어떤 페이지였거나, 어떤 행동을 하셨나요?\n1. 로그인/비밀번호 입력\n2. 파일(.apk, .exe 등) 다운로드\n3. 단순 접속만 한 뒤 닫음\n4. 앱 설치 후 접근성 / 기기 관리자 권한 허용\n5. 결제/송금/계좌정보 입력까지 진행\n6. 카메라/문자/연락처 등 스마트폰 권환을 광범위하게 허용\n7. 잘모르겠음 / 기억이 안남 "
                 }
 
         elif current_state == "ASKED_ACTION":
