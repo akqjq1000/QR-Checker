@@ -9,10 +9,6 @@ from modules.url_to_feature import extract_features
 from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
-# 웹 타이틀과 설명
-st.title("QR-Checker")
-st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안내 프로그램 입니다.')
-
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
 if 'rag_engine' not in st.session_state: # RAG 엔진
     with st.spinner('RAG 엔진 로드 중...'):
@@ -45,6 +41,10 @@ if st.toggle('웹 미리보기 기능 활성화', value=st.session_state.enable_
 else:
     st.session_state.enable_web_screenshot = False
 
+# 웹 타이틀과 설명
+st.title("QR-Checker")
+st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안내 프로그램 입니다.')
+
 # 이미지 업로드
 img = st.file_uploader("QR 코드 이미지를 업로드하세요", type=["png", "jpg", "jpeg"])
 
@@ -59,10 +59,8 @@ else:
     st.session_state.scan_result = None
     st.session_state.screenshot_path = None
 
-analysis_btn = st.button('분석하기', type='primary')
-
 # 2. 분석 로직 (버튼 클릭 시 실행)
-if analysis_btn and img:
+if st.button('분석하기', type='primary') and img:
     try:
         # 이미지 저장 경로 분리
         DATA_DIR = Path(__file__).parent / "data/qr-image"
@@ -74,11 +72,12 @@ if analysis_btn and img:
         url = qr_decoder.extract_url_from_qr(str(save_path))
 
         if url: # URL이 확인되면
-            # 짧은 URL 풀기
+            # 단축 URL 풀기
+            # 리다이렉션을 감지하여 최종 URL을 판별
             try:
                 resolved = resolve_url(url)
                 if resolved and resolved != url:
-                    st.info(f'단축 URL 탐지(원본: {url})')
+                    st.info(f'단축 URL 탐지: `{url}`')
                     url = resolved
             except URLResolutionError as e:
                 # 리디렉트 추적 실패 시 경고를 남기고 원본 URL로 진행
@@ -154,13 +153,14 @@ if st.session_state.scan_result:
     st.markdown("---")
     st.subheader("🔍 분석 대상")
 
-    st.write('추출된 URL:', url, unsafe_allow_html=True)
+    st.success(f'URL 추출 성공: `{url}`')
 
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
 
     if st.session_state.enable_web_screenshot:
         st.write('#### 샌드박스 추출로 안전한 미리보기')
+        st.caption('아래 링크를 클릭하면 미리보기 페이지가 생성됩니다.')
         if st.button(url, key=f"preview_{url}", disabled=(st.session_state.screenshot_path != None)):
             with st.spinner("웹페이지 미리보기 생성 중..."):
                 try:
@@ -264,6 +264,7 @@ if st.session_state.scan_result:
                         st.session_state.chat_history.append({"role": "assistant", "content": msg or "응답 처리 중 오류가 발생했습니다."})
                 
                 st.rerun() # 화면 갱신을 위해 리런
+
 
     else:
         # 정상 URL일 경우 성공 메시지 및 피처 표시
