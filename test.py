@@ -6,7 +6,6 @@ import modules.qr_decoder as qr_decoder
 from modules.ml_detector import MaliciousURLDetector
 from modules.AI_RAG.rag_engine5 import RAGEngine
 from modules.url_to_feature import extract_features
-# from modules.web_screenshot import capture_website # 잠시 비활성화
 from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
@@ -16,9 +15,20 @@ st.caption('큐싱을 예방하기 위한 QR 코드 분석 및 대응 방안 안
 
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
 if 'rag_engine' not in st.session_state: # RAG 엔진
-    st.session_state.rag_engine = RAGEngine()
+    with st.spinner('RAG 엔진 로드 중...'):
+        st.session_state.rag_engine = RAGEngine()
 if 'ml_detector' not in st.session_state: # ML 검사기
-    st.session_state.ml_detector = MaliciousURLDetector()
+    # 모델 종류
+    # AVAILABLE_MODELS = {
+    #         'xgboost': 'XGBoost_classifier.pkl',
+    #         'rf': 'RandomForest_classifier.pkl',
+    #         'randomforest': 'RandomForest_classifier.pkl',
+    #         'random forest': 'RandomForest_classifier.pkl',
+    #         'lgbm': 'LightGBM_classifier.pkl',
+    #         'lightgbm': 'LightGBM_classifier.pkl'
+    #     }
+    with st.spinner('모델 로드 중...'):
+        st.session_state.ml_detector = MaliciousURLDetector('rf')
 if 'scan_result' not in st.session_state: # 검사 결과
     st.session_state.scan_result = None
 if 'chat_history' not in st.session_state: # 채팅 기록
@@ -68,6 +78,7 @@ if analysis_btn and img:
             try:
                 resolved = resolve_url(url)
                 if resolved and resolved != url:
+                    st.info(f'단축 URL 탐지(원본: {url})')
                     url = resolved
             except URLResolutionError as e:
                 # 리디렉트 추적 실패 시 경고를 남기고 원본 URL로 진행
@@ -75,7 +86,8 @@ if analysis_btn and img:
             features = extract_features(url) # 피처 추출
             if not isinstance(features, FeatureVector): # 결과값 검증
                 try:
-                    features = FeatureVector(**features) # 피처 변수를 다시 등록하여 정상 적인 피처 변수로 변환
+                    # 피처 변수를 다시 등록하여 정상 적인 피처 변수로 변환
+                    features = FeatureVector(**features) 
                 except Exception:
                     pass
             # 추출된 피처 넣어서 악성 코드인지 검토
@@ -88,7 +100,7 @@ if analysis_btn and img:
                 except Exception:
                     pass
 
-            # 머신러닝 검사기의 결과와 URL을 넣어서 한 번 더 검증(외부 DB)
+            # 머신러닝 검사기의 결과와 URL을 넣어서 한 번 더 검증(외부 DB, RAG+chromadb, ML 모델 추가 검증)
             rag_response = st.session_state.rag_engine.init_scan(url, detection_result)
 
             # st.session_state 변수에 있는 값을 편하게 사용하기 위해서 일반 변수 선언
