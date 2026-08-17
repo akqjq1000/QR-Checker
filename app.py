@@ -10,21 +10,12 @@ from modules.url_resolver import resolve_url, URLResolutionError
 from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionResult
 
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
-if 'rag_engine' not in st.session_state: # RAG 엔진
-    with st.spinner('RAG 엔진 로드 중...'):
-        st.session_state.rag_engine = RAGEngine()
-if 'ml_detector' not in st.session_state: # ML 검사기
-    # 모델 종류
-    # AVAILABLE_MODELS = {
-    #         'xgboost': 'XGBoost_classifier.pkl',
-    #         'rf': 'RandomForest_classifier.pkl',
-    #         'randomforest': 'RandomForest_classifier.pkl',
-    #         'random forest': 'RandomForest_classifier.pkl',
-    #         'lgbm': 'LightGBM_classifier.pkl',
-    #         'lightgbm': 'LightGBM_classifier.pkl'
-    #     }
+if 'ml_detector' not in st.session_state:
     with st.spinner('모델 로드 중...'):
-        st.session_state.ml_detector = MaliciousURLDetector('rf')
+        st.session_state.ml_detector = MaliciousURLDetector('rf')   # xgboost, rf, randomforest, random forest, lgbm, lightgbm
+if 'rag_engine' not in st.session_state:
+    with st.spinner('RAG 엔진 로드 중...'):
+        st.session_state.rag_engine = RAGEngine(ml_detector=st.session_state.ml_detector)
 if 'scan_result' not in st.session_state: # 검사 결과
     st.session_state.scan_result = None
 if 'chat_history' not in st.session_state: # 채팅 기록
@@ -35,6 +26,8 @@ if 'last_file_name' not in st.session_state: # 업로드 파일 이름
     st.session_state.last_file_name = None
 if 'enable_web_screenshot' not in st.session_state:
     st.session_state.enable_web_screenshot = True
+if 'is_already_known' not in st.session_state:
+    st.session_state.is_already_known = False
 
 if st.toggle('웹 미리보기 기능 활성화', value=st.session_state.enable_web_screenshot):
     st.session_state.enable_web_screenshot = True
@@ -90,7 +83,7 @@ if st.button('분석하기', type='primary') and img:
                 except Exception:
                     pass
             # 추출된 피처 넣어서 악성 코드인지 검토
-            detection_result = st.session_state.ml_detector.predict(features=features)
+            detection_result = st.session_state.ml_detector.predict_url(url)
 
             # 결과값 검증
             if not isinstance(detection_result, DetectionResult):
@@ -117,6 +110,7 @@ if st.button('분석하기', type='primary') and img:
                     # 만약 악성 URL이라면 사용자와 2번의 채팅을 통해 RAG/파일 서치 + 웹 서치 진행
                     session_id = rag_response.get('session_id') # RAG 파트에서 사용할 세션 아이디
                     message = rag_response.get('message') # RAG 파트에서 제공해준 결과 메시지
+                    st.session_state.is_already_known = rag_response.get('is_already_known')
 
             # 응답 결과를 생성할 때 형식이 일치하지 않으면 강제로 맞추는 기능
             if analysis and not isinstance(analysis, AnalysisResult) and isinstance(analysis, dict):
@@ -154,6 +148,10 @@ if st.session_state.scan_result:
     st.subheader("🔍 분석 대상")
 
     st.success(f'URL 추출 성공: `{url}`')
+
+    # 악성 URL이 DB에 등록 되어있을 때
+    if st.session_state.is_already_known:
+        st.write(f':red[**▶  악성 URL로 이미 DB에 등록된 URL입니다.**]')
 
     if 'screenshot_path' not in st.session_state:
         st.session_state.screenshot_path = None
