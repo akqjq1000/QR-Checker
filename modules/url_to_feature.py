@@ -11,7 +11,10 @@ import re
 from typing import Final
 from urllib.parse import ParseResult, urlparse
 
-from modules.schema import *
+import tldextract
+
+from .domain_similarity import load_whitelist, min_distance_to_whitelist
+from .schema import *
 
 _HTTP_SCHEMES: Final[frozenset[str]] = frozenset({"http", "https"})
 _SCHEME_PATTERN: Final = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
@@ -28,13 +31,11 @@ _FILTER_WORDS: Final[tuple[str, ...]] = (
     "update",
 )
 
+_WHITELIST = load_whitelist()
+
 
 def normalize_url_for_features(url: str) -> str:
-    """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거.
-
-    URL 복구, 화면 표시, RAG, 웹 캡처 단계에서는 원본 URL을 그대로
-    사용하고, 학습 모델에 전달할 피처를 계산할 때만 이 함수를 사용한다.
-    """
+    """ML 피처 계산용 URL에서 HTTP/HTTPS 프로토콜을 제거."""
 
     if not isinstance(url, str):
         raise TypeError("url은 문자열(str)이어야 합니다.")
@@ -62,8 +63,6 @@ def normalize_url_for_features(url: str) -> str:
 
 
 def _validate_url_text(url: str) -> str:
-    """URL을 검사하고 ML 피처 계산용 문자열로 정규화한다."""
-
     return normalize_url_for_features(url)
 
 
@@ -99,16 +98,30 @@ def _parse_url(cleaned_url: str) -> tuple[ParseResult, str, str, str, int]:
     return parsed, domain, path, query, port
 
 
-def _split_domain(domain: str) -> tuple[str, str, str]:
-    """단순 점 분리 방식으로 도메인을 나눈다."""
+def split_domain(domain: str) -> tuple[str, str, str]:
+    """tldextract(Public Suffix List) 기반으로 domain을 (subdomain, root_domain, suffix)로 나눈다.
 
-    parts = domain.split(".")
+    기존에는 단순 점(.) 분리였으나, wikipedia.co.kr처럼 복합 suffix를
+    가진 도메인을 잘못 자르는 문제가 있어 tldextract로 교체함.
+    domain_similarity.py의 화이트리스트 매칭도 이 함수를 그대로 재사용해서
+    root domain 계산 기준을 프로젝트 전체에서 하나로 통일한다.
+    """
+    ext = tldextract.extract(domain)
 
-    if len(parts) > 2:
-        return ".".join(parts[:-2]), parts[-2], parts[-1]
-    if len(parts) == 2:
-        return "", parts[0], parts[1]
-    return "", domain, ""
+    if not ext.domain:
+        # tldextract가 인식 못한 경우(순수 IP 등) 폴백
+        parts = domain.split(".")
+        if len(parts) > 2:
+            return ".".join(parts[:-2]), parts[-2], parts[-1]
+        if len(parts) == 2:
+            return "", parts[0], parts[1]
+        return "", domain, ""
+
+    return ext.subdomain, ext.domain, ext.suffix
+
+
+# 기존 내부 호출부 및 하위 호환용 별칭
+_split_domain = split_domain
 
 
 def _calculate_entropy(text: str) -> float:
@@ -120,16 +133,15 @@ def _calculate_entropy(text: str) -> float:
     length = len(text)
     entropy = 0.0
 
-    
     for character in set(text):
         probability = text.count(character) / length
-        entropy += -probability * math.log(probability, 2)
+        entropy += -probability * math.log2(probability)
 
     return float(entropy)
 
 
 def extract_features(url: str) -> FeatureVector:
-    """URL 하나를 받아 ML 학습 기준의 16개 피처를 반환.
+    """URL 하나를 받아 ML 학습 기준의 17개 피처를 반환.
 
     프로토콜이 있는 URL과 없는 URL을 모두 지원하며, HTTP/HTTPS 프로토콜은
     제거한 뒤 모든 문자열 기반 피처를 계산.
@@ -137,15 +149,18 @@ def extract_features(url: str) -> FeatureVector:
 
     cleaned_url = _validate_url_text(url)
     _, domain, path, query, port = _parse_url(cleaned_url)
-    sub_domain, root_domain, suffix = _split_domain(domain)
+    sub_domain, root_domain, suffix = split_domain(domain)
 
     is_ip = bool(_IPV4_PATTERN.fullmatch(domain.split(":", 1)[0]))
-    is_private = bool(
-        is_ip
-        and domain.startswith(("192.168.", "10.", "172."))
-    )
+    is_private = bool(is_ip and domain.startswith(("192.168.", "10.", "172.")))
 
     alnum_count = len(_ASCII_ALNUM_PATTERN.findall(cleaned_url))
+
+    # 화이트리스트와의 도메인 유사도 (IP 주소는 개념상 무의미하므로 0.0 고정)
+    root_for_similarity = f"{root_domain}.{suffix}" if suffix else root_domain
+    domain_similarity = (
+        0.0 if is_ip else min_distance_to_whitelist(root_for_similarity, _WHITELIST)
+    )
 
     features = FeatureVector(
         len_url=len(cleaned_url),
@@ -162,10 +177,9 @@ def extract_features(url: str) -> FeatureVector:
         is_private=is_private,
         is_filter=any(word in cleaned_url.lower() for word in _FILTER_WORDS),
         num_port=port,
-        ratio_alpha_numeric=(
-            alnum_count / len(cleaned_url) if cleaned_url else 0.0
-        ),
+        ratio_alpha_numeric=(alnum_count / len(cleaned_url) if cleaned_url else 0.0),
         value_entropy_url=_calculate_entropy(cleaned_url),
+        domain_similarity=domain_similarity,
     )
 
     if list(features.to_dict()) != FEATURE_ORDER:
@@ -176,10 +190,9 @@ def extract_features(url: str) -> FeatureVector:
     return features
 
 
-
 extract = extract_features
 
-''' 테스트'''
+"""테스트"""
 if __name__ == "__main__":
     sample_url = "g00gle-login.com:8080/verify?id=123"
     sample_features = extract_features(sample_url)

@@ -221,3 +221,9 @@ __marimo__/
 .DS_Store
 # Models
 models/*.pkl
+
+# DataSet
+data/*.csv
+data/*.json
+!data/whitelist.txt
+!data/train_urls.csv
