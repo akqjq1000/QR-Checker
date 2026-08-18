@@ -12,7 +12,7 @@ from modules.schema import ScanReport, AnalysisResult, FeatureVector, DetectionR
 # 1. 세션 상태 초기화 (상태 유지를 위해 필수)
 if 'ml_detector' not in st.session_state:
     with st.spinner('모델 로드 중...'):
-        st.session_state.ml_detector = MaliciousURLDetector('rf')   # xgboost, rf, randomforest, random forest, lgbm, lightgbm
+        st.session_state.ml_detector = MaliciousURLDetector('xgboost')   # xgboost, rf, randomforest, random forest, lgbm, lightgbm
 if 'rag_engine' not in st.session_state:
     with st.spinner('RAG 엔진 로드 중...'):
         st.session_state.rag_engine = RAGEngine(ml_detector=st.session_state.ml_detector)
@@ -24,9 +24,9 @@ if 'chat_session_id' not in st.session_state: # OpenAI 채팅 세션
     st.session_state.chat_session_id = None
 if 'last_file_name' not in st.session_state: # 업로드 파일 이름
     st.session_state.last_file_name = None
-if 'enable_web_screenshot' not in st.session_state:
+if 'enable_web_screenshot' not in st.session_state: # 웹 사이트 미리보기 기능 사용 여부
     st.session_state.enable_web_screenshot = True
-if 'is_already_known' not in st.session_state:
+if 'is_already_known' not in st.session_state: # 이미 등록된 악성 URL 확인 여부
     st.session_state.is_already_known = False
 
 if st.toggle('웹 미리보기 기능 활성화', value=st.session_state.enable_web_screenshot):
